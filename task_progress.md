@@ -1,5 +1,0 @@
-- [ ] Backend: Add source_name/target_name to TopicEdgeResponse schema
-- [ ] Backend: Update map API to populate edge names & proposition data
-- [ ] Backend: Update classification prompt for source_topic
-- [ ] Backend: Create suggestion edges from parent topics to propositions
-- [ ] Frontend: Rewrite MapTab.jsx with reactflow visual graph
