@@ -1,0 +1,205 @@
+/* ─── Global Reset & Foundation ─────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Custom Scrollbar ────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(176, 155, 138, 0.25);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(176, 155, 138, 0.4);
+}
+
+/* ─── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(202, 111, 78, 0.25);
+  color: inherit;
+}
+
+/* ─── Focus Ring ────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid #CA6F4E;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── Animations ──────────────────────────────────────────── */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes subtleFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* ─── Utility Classes ─────────────────────────────────────── */
+.message-bubble {
+  animation: messageSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.empty-state-icon {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.glass-panel {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ─── MUI Overrides (global fallbacks) ─────────────────────── */
+.MuiButton-root,
+.MuiIconButton-root,
+.MuiListItemButton-root,
+.MuiChip-root,
+.MuiTab-root,
+.MuiAccordion-root {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ─── Markdown Styling ────────────────────────────────────── */
+.markdown-content p {
+  margin-bottom: 0.5em;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25em;
+}
+
+.markdown-content code {
+  background: rgba(202, 111, 78, 0.12);
+  border: 1px solid rgba(202, 111, 78, 0.18);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.8em;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.markdown-content pre {
+  margin: 0.75em 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.markdown-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* ─── Shimmer Loading ──────────────────────────────────────── */
+@keyframes shimmerLoading {
+  0% {
+    background-position: -200px 0;
+  }
+
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(202, 111, 78, 0.08) 50%, transparent 100%);
+  background-size: 200px 100%;
+  animation: shimmerLoading 1.5s ease-in-out infinite;
+}
