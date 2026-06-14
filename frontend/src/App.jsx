@@ -90,8 +90,9 @@ function AppContent() {
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [chatError, setChatError] = useState('');
+  const [exploringTopic, setExploringTopic] = useState(null);
+  const [hasClassified, setHasClassified] = useState(false);
   const wsRef = useRef(null);
-  const suggestionSentRef = useRef(false);
 
   const loadBrainstorms = useCallback(async () => {
     try { const res = await listBrainstorms(); setBrainstorms(res.data); return res.data; }
@@ -144,8 +145,6 @@ function AppContent() {
       if (ws) { ws.close(); wsRef.current = null; }
       return;
     }
-    // Reset suggestion trigger for this brainstorm
-    suggestionSentRef.current = false;
     // Close any previous connection before opening a new one
     if (ws) ws.close();
 
@@ -158,25 +157,17 @@ function AppContent() {
         const msg = JSON.parse(event.data);
         if (msg.event === 'classification_complete' || msg.event === 'classification_error') {
           console.log('[DEBUG] Classification event:', msg.event, '- reloading map + library');
+          if (msg.event === 'classification_error') {
+            console.error('[DEBUG] Classification error data:', msg.data);
+          }
           // Reload map + library after Celery finishes
           loadMap(activeBrainstorm.id);
           loadLibrary(activeBrainstorm.id);
           loadBrainstorms();
-          // After the first classification, auto-send a suggestion prompt
-          // so the LLM generates real subtopic recommendations for the map
-          if (!suggestionSentRef.current && msg.event === 'classification_complete') {
-            suggestionSentRef.current = true;
-            console.log('[DEBUG] Auto-triggering suggestion prompt');
-            sendMessage({
-              brainstorm_id: activeBrainstorm.id,
-              message: `List 10 specific subtopics, key concepts, and related fields that would appear on a knowledge map. Focus on the most important and well-established ones.`,
-            }).then(() => {
-              console.log('[DEBUG] Suggestion prompt sent');
-              loadBrainstorms();
-            }).catch((err) => {
-              console.error('[DEBUG] Failed to send suggestion prompt:', err);
-            });
-          }
+          // Clear the exploring indicator now that classification completed (or errored)
+          setExploringTopic(null);
+          setHasClassified(true);
+
         }
       } catch (err) {
         console.log('[DEBUG] WebSocket message parse error:', err.message);
@@ -284,7 +275,9 @@ function AppContent() {
 
   const handleSuggestionClick = useCallback((topicName) => {
     console.log('[DEBUG] handleSuggestionClick called with:', topicName);
-    // Stay on the map — explore the suggestion in the background
+    // Show immediate feedback on the map that we're exploring this topic
+    setExploringTopic(topicName);
+    // Send the topic name — the backend extracts it from the message
     void submitBrainstormMessage(topicName);
   }, [submitBrainstormMessage]);
 
@@ -374,6 +367,8 @@ function AppContent() {
             onUpdateLibraryEntry={handleUpdateLibraryEntry}
             onStartNewBrainstorm={handleStartNewBrainstorm}
             onSuggestionClick={handleSuggestionClick}
+            exploringTopic={exploringTopic}
+            hasClassified={hasClassified}
             themeId={themeId} onThemeChange={handleThemeChange}
             onModelChange={handleModelChange}
           />

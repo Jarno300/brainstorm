@@ -10,7 +10,7 @@ import LibraryTab from './LibraryTab';
 
 const MapTab = lazy(() => import('./MapTab'));
 
-function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabChange, onRefreshMap, onUpdateLibraryEntry, onSuggestionClick, themeId, onThemeChange, onModelChange, onStartNewBrainstorm }) {
+function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabChange, onRefreshMap, onUpdateLibraryEntry, onSuggestionClick, exploringTopic, hasClassified, themeId, onThemeChange, onModelChange, onStartNewBrainstorm }) {
     const [addModelOpen, setAddModelOpen] = useState(false);
     const [shareOpen, setShareOpen] = useState(false);
     const [refreshModels, setRefreshModels] = useState(null);
@@ -274,7 +274,7 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                                         <CircularProgress size={32} sx={(t) => ({ color: t.palette.primary.light })} />
                                     </Box>
                                 }>
-                                    <MapTab mapData={mapData} onRefresh={onRefreshMap} onSuggestionClick={onSuggestionClick} brainstormTitle={activeBrainstorm?.title} />
+                                    <MapTab mapData={mapData} onRefresh={onRefreshMap} onSuggestionClick={onSuggestionClick} brainstormTitle={activeBrainstorm?.title} exploringTopic={exploringTopic} hasClassified={hasClassified} />
                                 </Suspense>
                             </ErrorBoundary>
                         )}

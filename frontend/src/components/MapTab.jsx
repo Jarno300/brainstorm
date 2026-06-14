@@ -621,7 +621,7 @@ function MapCanvas({ mapData, onSuggestionClick }) {
 }
 
 // ─── Main MapTab component ────────────────────────────────────
-function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle }) {
+function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, exploringTopic, hasClassified }) {
     const theme = useTheme();
     const topics = mapData?.topics || [];
     const regularTopics = topics.filter((t) => !t.is_proposition);
@@ -677,6 +677,23 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle }) {
                             }}
                         />
                     )}
+                    {exploringTopic && (
+                        <Chip
+                            label={`Exploring: ${exploringTopic}`}
+                            size="small"
+                            sx={{
+                                height: 20, fontSize: '0.6rem', fontWeight: 700, borderRadius: '6px',
+                                bgcolor: alpha(theme.palette.info.main, 0.15),
+                                color: theme.palette.info.light,
+                                '& .MuiChip-label': { px: 0.8 },
+                                '@keyframes pulse': {
+                                    '0%, 100%': { opacity: 0.7 },
+                                    '50%': { opacity: 1 },
+                                },
+                                animation: 'pulse 1.5s ease-in-out infinite',
+                            }}
+                        />
+                    )}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
                     <Tooltip title="Refresh suggestions" arrow>
@@ -705,7 +722,72 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle }) {
             {/* ── Content ──────────────────────────────────────────── */}
             <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                 {regularTopics.length === 0 ? (
-                    <Box
+                    hasClassified ? (
+                        /* Classification ran but produced no topics — show error */
+                        <Box
+                            sx={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                height: '100%', flexDirection: 'column', gap: 2.5,
+                            }}
+                        >
+                            <Box
+                                sx={(theme) => ({
+                                    width: 72, height: 72, borderRadius: 2,
+                                    background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.12)} 0%, ${alpha(theme.palette.error.light, 0.06)} 100%)`,
+                                    border: '1px solid',
+                                    borderColor: alpha(theme.palette.error.main, 0.12),
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                })}
+                            >
+                                <HubIcon
+                                    sx={(theme) => ({
+                                        fontSize: 28,
+                                        color: alpha(theme.palette.error.light, 0.7),
+                                    })}
+                                />
+                            </Box>
+                            <Box sx={{ textAlign: 'center', maxWidth: 320 }}>
+                                <Typography
+                                    sx={(theme) => ({
+                                        fontWeight: 700,
+                                        color: theme.palette.text.primary,
+                                        mb: 0.75, fontSize: '1rem',
+                                    })}
+                                >
+                                    Couldn't build this map
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={(theme) => ({
+                                        color: alpha(theme.palette.text.secondary, 0.65),
+                                        lineHeight: 1.6,
+                                        fontSize: '0.8rem',
+                                    })}
+                                >
+                                    The AI had trouble with this topic. You can refresh the map or try a different topic.
+                                </Typography>
+                            </Box>
+                            <Tooltip title="Retry" arrow>
+                                <IconButton
+                                    onClick={onRefresh}
+                                    sx={(theme) => ({
+                                        mt: 1, borderRadius: 1.5,
+                                        border: '1px solid',
+                                        borderColor: alpha(theme.palette.divider, 0.5),
+                                        color: alpha(theme.palette.text.secondary, 0.5),
+                                        '&:hover': {
+                                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                            color: theme.palette.primary.light,
+                                        },
+                                    })}
+                                >
+                                    <RefreshIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    ) : (
+                        /* Still waiting for classification — show loading spinner */
+                        <Box
                         sx={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             height: '100%', flexDirection: 'column', gap: 2.5,
@@ -773,6 +855,7 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle }) {
                             </Box>
                         </Box>
                     </Box>
+                    )
                 ) : (
                     <MapCanvas mapData={mapData} onSuggestionClick={onSuggestionClick} />
                 )}
