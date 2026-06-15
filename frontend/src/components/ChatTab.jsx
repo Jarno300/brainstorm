@@ -111,6 +111,7 @@ function ChatTab({ messages, onSendMessage, sending, errorMessage }) {
                     messages.map((msg, i) => {
                         const isUser = msg.role === 'user';
                         const isThinking = msg.role === 'assistant' && msg.isThinking;
+                        const isStreaming = msg.role === 'assistant' && msg.isStreaming;
                         return (
                             <Box key={msg.id || i} className="message-bubble"
                                 sx={{
@@ -124,8 +125,6 @@ function ChatTab({ messages, onSendMessage, sending, errorMessage }) {
                                 <Avatar sx={(theme) => ({
                                     width: 30, height: 30, borderRadius: 2,
                                     bgcolor: isUser ? alpha(theme.palette.primary.main, 0.5) : 'transparent',
-                                    border: isUser ? 'none' : '1px solid',
-                                    borderColor: alpha(theme.palette.divider, 0.6),
                                     flexShrink: 0,
                                 })}>
                                     {isUser
@@ -138,8 +137,6 @@ function ChatTab({ messages, onSendMessage, sending, errorMessage }) {
                                 <Box className="message-bubble-content" sx={(theme) => ({
                                     px: 2.5, py: 1.75,
                                     borderRadius: 2,
-                                    border: isUser ? 'none' : '1px solid',
-                                    borderColor: isUser ? 'none' : alpha(theme.palette.divider, 0.5),
                                     position: 'relative',
                                     boxShadow: isUser
                                         ? `0 4px 20px ${alpha(theme.palette.primary.main, 0.25)}`
@@ -185,7 +182,7 @@ function ChatTab({ messages, onSendMessage, sending, errorMessage }) {
                                         })}>
                                             {isThinking ? 'now' : formatMessageTime(msg.created_at)}
                                         </Typography>
-                                        {!isThinking && (
+                                        {!isThinking && !isStreaming && (
                                             <Tooltip title={copiedId === msg.id ? 'Copied!' : 'Copy message'} arrow>
                                                 <IconButton
                                                     className="copy-btn"
@@ -239,7 +236,6 @@ function ChatTab({ messages, onSendMessage, sending, errorMessage }) {
             {/* ── Input Area ────────────────────────────────────────── */}
             <Box sx={(theme) => ({
                 px: { xs: 2, md: 4 }, py: 2,
-                borderTop: '1px solid', borderColor: alpha(theme.palette.divider, 0.6),
                 bgcolor: alpha(theme.palette.background.default, 0.5),
                 position: 'relative',
                 '&::before': {
@@ -265,8 +261,6 @@ function ChatTab({ messages, onSendMessage, sending, errorMessage }) {
                                 sx: (theme) => ({
                                     borderRadius: 1.5,
                                     bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.6 : 0.5),
-                                    border: '1px solid',
-                                    borderColor: alpha(theme.palette.divider, 0.6),
                                     fontSize: '0.85rem',
                                     lineHeight: 1.6,
                                     color: theme.palette.text.primary,

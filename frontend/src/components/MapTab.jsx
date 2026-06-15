@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, memo } from 'react';
 import {
     Box, Typography, IconButton, Tooltip, Chip, alpha, useTheme, CircularProgress,
 } from '@mui/material';
@@ -20,31 +20,30 @@ import 'reactflow/dist/style.css';
 // ─── Theme-derived colour helpers ────────────────────────────
 function getImportanceColors(theme) {
     const isDark = theme.palette.mode === 'dark';
-    const p = theme.palette;
     return {
         core: {
-            border: alpha(p.primary.main, isDark ? 0.4 : 0.35),
-            text: p.primary.light,
-            glow: alpha(p.primary.main, isDark ? 0.2 : 0.15),
-            nodeBg: alpha(p.primary.main, isDark ? 0.08 : 0.06),
+            border: isDark ? 'rgba(251,191,36,0.55)' : 'rgba(217,119,6,0.45)',
+            text: isDark ? 'rgba(251,191,36,0.95)' : 'rgba(180,83,9,0.9)',
+            glow: isDark ? 'rgba(251,191,36,0.22)' : 'rgba(217,119,6,0.18)',
+            nodeBg: isDark ? 'rgba(251,191,36,0.1)' : 'rgba(254,243,199,0.7)',
         },
         high: {
-            border: alpha(p.primary.light, isDark ? 0.35 : 0.28),
-            text: p.primary.light,
-            glow: alpha(p.primary.light, isDark ? 0.15 : 0.1),
-            nodeBg: alpha(p.primary.light, isDark ? 0.06 : 0.04),
+            border: isDark ? 'rgba(94,234,212,0.5)' : 'rgba(13,148,136,0.4)',
+            text: isDark ? 'rgba(94,234,212,0.9)' : 'rgba(15,118,110,0.85)',
+            glow: isDark ? 'rgba(94,234,212,0.18)' : 'rgba(13,148,136,0.14)',
+            nodeBg: isDark ? 'rgba(94,234,212,0.08)' : 'rgba(204,251,241,0.6)',
         },
         medium: {
-            border: alpha(p.secondary.main, isDark ? 0.3 : 0.25),
-            text: p.secondary.light,
-            glow: alpha(p.secondary.main, isDark ? 0.12 : 0.08),
-            nodeBg: alpha(p.secondary.main, isDark ? 0.05 : 0.03),
+            border: isDark ? 'rgba(167,139,250,0.45)' : 'rgba(124,58,237,0.35)',
+            text: isDark ? 'rgba(167,139,250,0.85)' : 'rgba(109,40,217,0.8)',
+            glow: isDark ? 'rgba(167,139,250,0.16)' : 'rgba(124,58,237,0.12)',
+            nodeBg: isDark ? 'rgba(167,139,250,0.07)' : 'rgba(237,233,254,0.55)',
         },
         low: {
-            border: alpha(p.text.secondary, isDark ? 0.2 : 0.15),
-            text: p.text.secondary,
-            glow: alpha(p.text.secondary, isDark ? 0.08 : 0.05),
-            nodeBg: alpha(p.text.secondary, isDark ? 0.04 : 0.025),
+            border: isDark ? 'rgba(148,163,184,0.3)' : 'rgba(100,116,139,0.25)',
+            text: isDark ? 'rgba(203,213,225,0.7)' : 'rgba(71,85,105,0.7)',
+            glow: isDark ? 'rgba(148,163,184,0.08)' : 'rgba(100,116,139,0.05)',
+            nodeBg: isDark ? 'rgba(148,163,184,0.05)' : 'rgba(241,245,249,0.5)',
         },
     };
 }
@@ -281,7 +280,14 @@ function TopicNode({ data, selected }) {
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
     const impColors = getImportanceColors(theme);
+    const isSelected = selected || data.isSelected;
     const colors = impColors[data.importance] || impColors.low;
+    const handleStyle = {
+        width: 7, height: 7,
+        background: colors.text,
+        border: `2px solid ${alpha(colors.text, 0.25)}`,
+        opacity: 0.55,
+    };
 
     return (
         <Box
@@ -293,12 +299,12 @@ function TopicNode({ data, selected }) {
                     ? alpha(colors.nodeBg, 0.6)
                     : alpha(colors.nodeBg, 0.4),
                 border: '1.5px solid',
-                borderColor: selected ? colors.text : colors.border,
+                borderColor: isSelected ? colors.text : colors.border,
                 cursor: 'pointer',
                 minWidth: 140,
                 maxWidth: 220,
                 transition: 'all 0.2s ease',
-                boxShadow: selected
+                boxShadow: isSelected
                     ? `0 0 20px ${colors.glow}, 0 4px 12px rgba(0,0,0,0.15)`
                     : `0 2px 8px rgba(0,0,0,0.08)`,
                 '&:hover': {
@@ -308,16 +314,14 @@ function TopicNode({ data, selected }) {
                 position: 'relative',
             }}
         >
-            <Handle
-                type="target"
-                position={Position.Top}
-                style={{
-                    width: 8, height: 8,
-                    background: colors.text,
-                    border: `2px solid ${alpha(colors.text, 0.3)}`,
-                    opacity: 0.6,
-                }}
-            />
+            <Handle type="target" position={Position.Top} id="top" style={handleStyle} />
+            <Handle type="target" position={Position.Bottom} id="bottom" style={handleStyle} />
+            <Handle type="target" position={Position.Left} id="left" style={handleStyle} />
+            <Handle type="target" position={Position.Right} id="right" style={handleStyle} />
+            <Handle type="source" position={Position.Top} id="top-s" style={handleStyle} />
+            <Handle type="source" position={Position.Bottom} id="bottom-s" style={handleStyle} />
+            <Handle type="source" position={Position.Left} id="left-s" style={handleStyle} />
+            <Handle type="source" position={Position.Right} id="right-s" style={handleStyle} />
             <Typography
                 sx={{
                     fontSize: '0.825rem',
@@ -328,16 +332,6 @@ function TopicNode({ data, selected }) {
             >
                 {data.label}
             </Typography>
-            <Handle
-                type="source"
-                position={Position.Bottom}
-                style={{
-                    width: 8, height: 8,
-                    background: colors.text,
-                    border: `2px solid ${alpha(colors.text, 0.3)}`,
-                    opacity: 0.6,
-                }}
-            />
         </Box>
     );
 }
@@ -346,6 +340,7 @@ function TopicNode({ data, selected }) {
 function SuggestionNode({ data, selected }) {
     const theme = useTheme();
     const sugColors = getSuggestionColors(theme);
+    const isExploring = Boolean(data?.isExploring);
 
     return (
         <Box
@@ -362,9 +357,34 @@ function SuggestionNode({ data, selected }) {
                 minWidth: 120,
                 maxWidth: 180,
                 transition: 'all 0.2s ease',
-                boxShadow: selected
-                    ? `0 0 20px ${sugColors.glow}, 0 4px 12px rgba(0,0,0,0.12)`
-                    : `0 2px 6px rgba(0,0,0,0.06)`,
+                overflow: 'hidden',
+                boxShadow: isExploring
+                    ? `0 0 0 1px ${alpha(sugColors.text, 0.2)}, 0 0 22px ${alpha(sugColors.text, 0.14)}, 0 4px 12px rgba(0,0,0,0.12)`
+                    : selected
+                        ? `0 0 20px ${sugColors.glow}, 0 4px 12px rgba(0,0,0,0.12)`
+                        : `0 2px 6px rgba(0,0,0,0.06)`,
+                '&::before': isExploring ? {
+                    content: '""',
+                    position: 'absolute',
+                    inset: 0,
+                    background: `linear-gradient(120deg,
+                        transparent 0%,
+                        ${alpha(sugColors.text, 0.03)} 28%,
+                        ${alpha(sugColors.text, 0.12)} 45%,
+                        ${alpha(theme.palette.warning.light, 0.16)} 50%,
+                        ${alpha(sugColors.text, 0.12)} 55%,
+                        ${alpha(sugColors.text, 0.03)} 72%,
+                        transparent 100%)`,
+                    backgroundSize: '220% 100%',
+                    opacity: 0.75,
+                    pointerEvents: 'none',
+                    animation: 'suggestionColorWave 4.8s ease-in-out infinite',
+                } : {},
+                '@keyframes suggestionColorWave': {
+                    '0%': { backgroundPosition: '0% 50%', opacity: 0.45 },
+                    '50%': { backgroundPosition: '100% 50%', opacity: 0.9 },
+                    '100%': { backgroundPosition: '0% 50%', opacity: 0.45 },
+                },
                 '&:hover': {
                     boxShadow: `0 0 20px ${sugColors.glow}, 0 6px 14px rgba(0,0,0,0.1)`,
                     borderColor: sugColors.text,
@@ -404,6 +424,19 @@ function SuggestionNode({ data, selected }) {
                 >
                     {data.label}
                 </Typography>
+                {isExploring && (
+                    <Typography
+                        sx={(theme) => ({
+                            mt: 0.25,
+                            fontSize: '0.62rem',
+                            fontWeight: 600,
+                            color: alpha(theme.palette.text.secondary, 0.8),
+                            letterSpacing: '0.02em',
+                        })}
+                    >
+                        exploring topic...
+                    </Typography>
+                )}
             </Box>
             <Handle
                 type="source"
@@ -419,8 +452,12 @@ function SuggestionNode({ data, selected }) {
     );
 }
 
+// Memoized node components — prevent re-renders when props (data, selected) are unchanged
+const MemoTopicNode = memo(TopicNode);
+const MemoSuggestionNode = memo(SuggestionNode);
+
 // ─── Inner canvas ────────────────────────────────────────────
-function MapCanvas({ mapData, onSuggestionClick }) {
+const MapCanvas = memo(function MapCanvas({ mapData, onSuggestionClick, onTopicClick, selectedTopic, exploringTopic }) {
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
 
@@ -430,6 +467,10 @@ function MapCanvas({ mapData, onSuggestionClick }) {
     const regularTopics = useMemo(
         () => topics.filter((topic) => !topic.is_proposition),
         [topics],
+    );
+    const normalizedExploringTopic = useMemo(
+        () => formatLabel(exploringTopic).trim().toLowerCase(),
+        [exploringTopic],
     );
 
     // Build reactflow nodes and edges from data
@@ -444,6 +485,7 @@ function MapCanvas({ mapData, onSuggestionClick }) {
                 label: formatLabel(topic.name),
                 importance: topic.importance || computeImportance(topic.confidence),
                 mentionCount: Math.max(1, Math.round((topic.confidence || 0.3) * 5)),
+                isSelected: selectedTopic?.id === topic.id,
             },
         }));
 
@@ -470,6 +512,7 @@ function MapCanvas({ mapData, onSuggestionClick }) {
                 sourceTopicId: sourceId,
                 sourceTopicName: formatLabel(suggestion.source_topic_name),
                 isSynthetic: false,
+                isExploring: label.trim().toLowerCase() === normalizedExploringTopic,
             });
         });
 
@@ -495,7 +538,10 @@ function MapCanvas({ mapData, onSuggestionClick }) {
                     id: entry.id,
                     type: 'suggestion',
                     position,
-                    data: entry,
+                    data: {
+                        ...entry,
+                        isExploring: entry.label.trim().toLowerCase() === normalizedExploringTopic,
+                    },
                 });
                 suggestionEdges.push({
                     id: `${sourceId}--${entry.id}`,
@@ -521,29 +567,40 @@ function MapCanvas({ mapData, onSuggestionClick }) {
 
         const builtEdges = edges
             .filter((edge) => edge.relationship !== 'suggestion')
-            .map((edge) => ({
-                id: String(edge.id),
-                source: String(edge.source_topic_id),
-                target: String(edge.target_topic_id),
-                type: 'smoothstep',
-                style: {
-                    stroke: alpha(theme.palette.primary.light, 0.4),
-                    strokeWidth: 2.25,
-                },
-                markerEnd: {
-                    type: MarkerType.ArrowClosed,
-                    color: alpha(theme.palette.primary.light, 0.45),
-                    width: 16,
-                    height: 16,
-                },
-            }))
+            .map((edge) => {
+                const sourcePos = positions[String(edge.source_topic_id)];
+                const targetPos = positions[String(edge.target_topic_id)];
+                const connector = sourcePos && targetPos
+                    ? getConnectorPositions(sourcePos, targetPos)
+                    : { sourcePosition: Position.Bottom, targetPosition: Position.Top };
+                const weight = edge.weight || 0.5;
+                const edgeColor = alpha(theme.palette.primary.light, 0.25 + weight * 0.3);
+                return {
+                    id: String(edge.id),
+                    source: String(edge.source_topic_id),
+                    target: String(edge.target_topic_id),
+                    type: 'smoothstep',
+                    sourcePosition: connector.sourcePosition,
+                    targetPosition: connector.targetPosition,
+                    style: {
+                        stroke: edgeColor,
+                        strokeWidth: 1.5 + weight * 1.5,
+                    },
+                    markerEnd: {
+                        type: MarkerType.ArrowClosed,
+                        color: edgeColor,
+                        width: 14 + weight * 4,
+                        height: 14 + weight * 4,
+                    },
+                };
+            })
             .concat(suggestionEdges);
 
         return {
             flowNodes: [...topicNodes, ...suggestionNodes],
             flowEdges: builtEdges,
         };
-    }, [topics, edges, suggestions, regularTopics]);
+    }, [topics, edges, suggestions, regularTopics, normalizedExploringTopic]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
     const [canvasEdges, setCanvasEdges, onEdgesChange] = useEdgesState(flowEdges);
@@ -553,18 +610,14 @@ function MapCanvas({ mapData, onSuggestionClick }) {
         setCanvasEdges(flowEdges);
     }, [flowNodes, flowEdges, setNodes, setCanvasEdges]);
 
-    // Create a stable key so reactflow remounts cleanly when data changes
-    const dataKey = `${topics.length}-${edges.length}-${suggestions.length}-${isDark}`;
-
     const nodeTypes = useMemo(
-        () => ({ topic: TopicNode, suggestion: SuggestionNode }),
+        () => ({ topic: MemoTopicNode, suggestion: MemoSuggestionNode }),
         [],
     );
 
     return (
         <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
             <ReactFlow
-                key={dataKey}
                 nodes={nodes}
                 edges={canvasEdges}
                 onNodesChange={onNodesChange}
@@ -574,6 +627,11 @@ function MapCanvas({ mapData, onSuggestionClick }) {
                     if (node.type === 'suggestion') {
                         console.log('[DEBUG] Triggering onSuggestionClick with:', node.data?.label);
                         onSuggestionClick?.(node.data?.label);
+                    } else if (node.type === 'topic') {
+                        const topic = topics.find(t => String(t.id) === node.id);
+                        if (topic) {
+                            onTopicClick?.(topic);
+                        }
                     }
                 }}
                 nodeTypes={nodeTypes}
@@ -618,10 +676,10 @@ function MapCanvas({ mapData, onSuggestionClick }) {
             </ReactFlow>
         </Box>
     );
-}
+});
 
 // ─── Main MapTab component ────────────────────────────────────
-function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, exploringTopic, hasClassified }) {
+function MapTab({ mapData, onRefresh, onSuggestionClick, onTopicClick, selectedTopic, brainstormTitle, exploringTopic, hasClassified }) {
     const theme = useTheme();
     const topics = mapData?.topics || [];
     const regularTopics = topics.filter((t) => !t.is_proposition);
@@ -633,8 +691,6 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, explor
                 sx={(theme) => ({
                     px: 3, py: 1.75,
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    borderBottom: '1px solid',
-                    borderColor: alpha(theme.palette.divider, 0.5),
                     bgcolor: alpha(theme.palette.background.default, 0.3),
                 })}
             >
@@ -665,35 +721,6 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, explor
                             })}
                         />
                     )}
-                    {regularTopics.length > 0 && (
-                        <Chip
-                            label="3 suggestions each"
-                            size="small"
-                            sx={{
-                                height: 20, fontSize: '0.6rem', fontWeight: 700, borderRadius: '6px',
-                                bgcolor: alpha(theme.palette.warning.main, 0.1),
-                                color: theme.palette.warning.light,
-                                '& .MuiChip-label': { px: 0.8 },
-                            }}
-                        />
-                    )}
-                    {exploringTopic && (
-                        <Chip
-                            label={`Exploring: ${exploringTopic}`}
-                            size="small"
-                            sx={{
-                                height: 20, fontSize: '0.6rem', fontWeight: 700, borderRadius: '6px',
-                                bgcolor: alpha(theme.palette.info.main, 0.15),
-                                color: theme.palette.info.light,
-                                '& .MuiChip-label': { px: 0.8 },
-                                '@keyframes pulse': {
-                                    '0%, 100%': { opacity: 0.7 },
-                                    '50%': { opacity: 1 },
-                                },
-                                animation: 'pulse 1.5s ease-in-out infinite',
-                            }}
-                        />
-                    )}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
                     <Tooltip title="Refresh suggestions" arrow>
@@ -702,8 +729,6 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, explor
                             size="small"
                             sx={(theme) => ({
                                 width: 30, height: 30, borderRadius: 1.5,
-                                border: '1px solid',
-                                borderColor: alpha(theme.palette.divider, 0.5),
                                 color: alpha(theme.palette.text.secondary, 0.5),
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
@@ -772,8 +797,6 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, explor
                                     onClick={onRefresh}
                                     sx={(theme) => ({
                                         mt: 1, borderRadius: 1.5,
-                                        border: '1px solid',
-                                        borderColor: alpha(theme.palette.divider, 0.5),
                                         color: alpha(theme.palette.text.secondary, 0.5),
                                         '&:hover': {
                                             bgcolor: alpha(theme.palette.primary.main, 0.08),
@@ -788,76 +811,76 @@ function MapTab({ mapData, onRefresh, onSuggestionClick, brainstormTitle, explor
                     ) : (
                         /* Still waiting for classification — show loading spinner */
                         <Box
-                        sx={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            height: '100%', flexDirection: 'column', gap: 2.5,
-                        }}
-                    >
-                        <Box
-                            sx={(theme) => ({
-                                width: 72, height: 72, borderRadius: 2,
-                                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.primary.light, 0.08)} 100%)`,
-                                border: '1px solid',
-                                borderColor: alpha(theme.palette.primary.main, 0.1),
+                            sx={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                position: 'relative',
-                                '@keyframes pulseGlow': {
-                                    '0%, 100%': { boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.1)}` },
-                                    '50%': { boxShadow: `0 0 40px ${alpha(theme.palette.primary.main, 0.25)}` },
-                                },
-                                animation: 'pulseGlow 2s ease-in-out infinite',
-                            })}
+                                height: '100%', flexDirection: 'column', gap: 2.5,
+                            }}
                         >
-                            <HubIcon
+                            <Box
                                 sx={(theme) => ({
-                                    fontSize: 28,
-                                    color: theme.palette.primary.light,
-                                    '@keyframes spin': {
-                                        '0%': { transform: 'rotate(0deg)' },
-                                        '100%': { transform: 'rotate(360deg)' },
+                                    width: 72, height: 72, borderRadius: 2,
+                                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.primary.light, 0.08)} 100%)`,
+                                    border: '1px solid',
+                                    borderColor: alpha(theme.palette.primary.main, 0.1),
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    position: 'relative',
+                                    '@keyframes pulseGlow': {
+                                        '0%, 100%': { boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.1)}` },
+                                        '50%': { boxShadow: `0 0 40px ${alpha(theme.palette.primary.main, 0.25)}` },
                                     },
-                                    animation: 'spin 3s linear infinite',
-                                })}
-                            />
-                        </Box>
-                        <Box sx={{ textAlign: 'center', maxWidth: 300 }}>
-                            <Typography
-                                sx={(theme) => ({
-                                    fontWeight: 700,
-                                    color: theme.palette.text.primary,
-                                    mb: 0.75, fontSize: '1rem',
+                                    animation: 'pulseGlow 2s ease-in-out infinite',
                                 })}
                             >
-                                Building your knowledge map
-                            </Typography>
-                            <Typography
-                                sx={(theme) => ({
-                                    fontWeight: 500,
-                                    color: theme.palette.primary.light,
-                                    mb: 1, fontSize: '0.85rem',
-                                    fontStyle: 'italic',
-                                })}
-                            >
-                                "{brainstormTitle || 'Untitled'}"
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                                <CircularProgress size={12} sx={(t) => ({ color: alpha(t.palette.primary.light, 0.6) })} />
-                                <Typography
-                                    variant="body2"
+                                <HubIcon
                                     sx={(theme) => ({
-                                        color: alpha(theme.palette.text.secondary, 0.55),
-                                        lineHeight: 1.6,
-                                        fontSize: '0.78rem',
+                                        fontSize: 28,
+                                        color: theme.palette.primary.light,
+                                        '@keyframes spin': {
+                                            '0%': { transform: 'rotate(0deg)' },
+                                            '100%': { transform: 'rotate(360deg)' },
+                                        },
+                                        animation: 'spin 3s linear infinite',
+                                    })}
+                                />
+                            </Box>
+                            <Box sx={{ textAlign: 'center', maxWidth: 300 }}>
+                                <Typography
+                                    sx={(theme) => ({
+                                        fontWeight: 700,
+                                        color: theme.palette.text.primary,
+                                        mb: 0.75, fontSize: '1rem',
                                     })}
                                 >
-                                    Analyzing and structuring knowledge...
+                                    Building your knowledge map
                                 </Typography>
+                                <Typography
+                                    sx={(theme) => ({
+                                        fontWeight: 500,
+                                        color: theme.palette.primary.light,
+                                        mb: 1, fontSize: '0.85rem',
+                                        fontStyle: 'italic',
+                                    })}
+                                >
+                                    "{brainstormTitle || 'Untitled'}"
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                    <CircularProgress size={12} sx={(t) => ({ color: alpha(t.palette.primary.light, 0.6) })} />
+                                    <Typography
+                                        variant="body2"
+                                        sx={(theme) => ({
+                                            color: alpha(theme.palette.text.secondary, 0.55),
+                                            lineHeight: 1.6,
+                                            fontSize: '0.78rem',
+                                        })}
+                                    >
+                                        Analyzing and structuring knowledge...
+                                    </Typography>
+                                </Box>
                             </Box>
                         </Box>
-                    </Box>
                     )
                 ) : (
-                    <MapCanvas mapData={mapData} onSuggestionClick={onSuggestionClick} />
+                    <MapCanvas mapData={mapData} onSuggestionClick={onSuggestionClick} onTopicClick={onTopicClick} selectedTopic={selectedTopic} exploringTopic={exploringTopic} />
                 )}
             </Box>
         </Box>

@@ -1,10 +1,11 @@
 import uuid
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from app.database import utcnow
 from app.models.brainstorm import Brainstorm
 from app.models.message import Message, MessageRole
+from app.models.topic import Topic
 from app.schemas.brainstorm import BrainstormCreate, BrainstormResponse, BrainstormListItem
 
 
@@ -33,21 +34,59 @@ def get_brainstorm(db: Session, brainstorm_id: uuid.UUID, user_id: uuid.UUID | N
 
 
 def list_brainstorms(db: Session, skip: int = 0, limit: int = 100, user_id: uuid.UUID | None = None) -> List[BrainstormListItem]:
-    query = _active_query(db).order_by(desc(Brainstorm.updated_at))
+    """List brainstorms with message and topic counts in a single query.
+
+    Uses correlated subqueries via outer joins to avoid the N+1 problem
+    that would result from looping and issuing COUNT queries per row.
+    """
+    # Subquery: message count per brainstorm
+    msg_subq = (
+        db.query(
+            Message.brainstorm_id,
+            func.count(Message.id).label("msg_count"),
+        )
+        .group_by(Message.brainstorm_id)
+        .subquery()
+    )
+
+    # Subquery: explored (non-proposition) topic count per brainstorm
+    topic_subq = (
+        db.query(
+            Topic.brainstorm_id,
+            func.count(Topic.id).label("topic_count"),
+        )
+        .filter(Topic.is_proposition == False)
+        .group_by(Topic.brainstorm_id)
+        .subquery()
+    )
+
+    query = (
+        db.query(
+            Brainstorm,
+            func.coalesce(msg_subq.c.msg_count, 0).label("msg_count"),
+            func.coalesce(topic_subq.c.topic_count, 0).label("topic_count"),
+        )
+        .outerjoin(msg_subq, Brainstorm.id == msg_subq.c.brainstorm_id)
+        .outerjoin(topic_subq, Brainstorm.id == topic_subq.c.brainstorm_id)
+        .filter(Brainstorm.deleted_at.is_(None))
+    )
+
     if user_id:
         query = query.filter(Brainstorm.user_id == user_id)
-    brainstorms = query.offset(skip).limit(limit).all()
-    result = []
-    for b in brainstorms:
-        msg_count = db.query(Message).filter(Message.brainstorm_id == b.id).count()
-        result.append(BrainstormListItem(
+
+    rows = query.order_by(desc(Brainstorm.updated_at)).offset(skip).limit(limit).all()
+
+    return [
+        BrainstormListItem(
             id=b.id,
             title=b.title,
             created_at=b.created_at,
             updated_at=b.updated_at,
             message_count=msg_count,
-        ))
-    return result
+            explored_topic_count=topic_count,
+        )
+        for b, msg_count, topic_count in rows
+    ]
 
 
 def update_brainstorm_title(db: Session, brainstorm_id: uuid.UUID, title: str) -> Optional[Brainstorm]:

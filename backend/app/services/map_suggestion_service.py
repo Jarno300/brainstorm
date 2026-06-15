@@ -1,8 +1,8 @@
 import uuid
 import re
+import random
 
 from app.models.topic_edge import TopicEdge
-from app.services.classification_service import propose_related_topics_from_content
 from app.services.library_service import get_latest_library_entry_for_topic
 from app.services.topic_service import (
     create_edge,
@@ -22,6 +22,33 @@ def get_source_text_for_topic(db, topic) -> str:
         return topic.description
 
     return topic.name.replace("-", " ")
+
+
+def _extract_related_topics_from_library_entry(source_text: str) -> list:
+    """Pull the related-topics bullets from a library entry, if present."""
+    match = re.search(
+        r"(?ims)^##\s*Related Topics:\s*$\s*(.*?)(?=^##\s+|\Z)",
+        source_text,
+    )
+    if not match:
+        return []
+
+    related_topics = []
+    seen = set()
+    for line in match.group(1).splitlines():
+        cleaned = re.sub(r"^\s*[-*+]\s*", "", line).strip()
+        if not cleaned:
+            continue
+        normalized = normalize_topic_name(cleaned)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        related_topics.append({
+            "name": normalized.replace(" ", "-"),
+            "description": f"Explore {cleaned} because it was listed in the library entry's related topics.",
+        })
+
+    return related_topics
 
 
 def _extract_concrete_topics_from_text(source_topic, source_text: str, existing_topic_names: set) -> list:
@@ -109,13 +136,12 @@ def rebuild_map_suggestions(db, brainstorm_id: uuid.UUID, commit: bool = True):
     created_suggestions = []
     for source_topic in main_topics:
         source_text = get_source_text_for_topic(db, source_topic)
-        proposals = propose_related_topics_from_content(
-            source_topic_name=source_topic.name,
-            source_text=source_text,
-            existing_topic_names=sorted(existing_topic_names),
-        )
 
-        # Fallback to concrete suggestions extracted from source text if AI returned nothing
+        proposals = _extract_related_topics_from_library_entry(source_text)
+        if proposals:
+            proposals = random.sample(proposals, k=min(3, len(proposals)))
+
+        # Fallback to concrete suggestions extracted from source text — no LLM call
         if not proposals:
             proposals = _extract_concrete_topics_from_text(source_topic, source_text, existing_topic_names)
 

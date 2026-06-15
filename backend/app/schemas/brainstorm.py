@@ -32,6 +32,7 @@ class BrainstormListItem(BaseModel):
     created_at: datetime
     updated_at: datetime
     message_count: int = 0
+    explored_topic_count: int = 0
 
     class Config:
         from_attributes = True

@@ -22,17 +22,23 @@ import LoginDialog from './auth/LoginDialog';
 import RegisterDialog from './auth/RegisterDialog';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
+import TopicDetailPanel from './components/TopicDetailPanel';
 import {
   listBrainstorms,
   createBrainstorm,
   getBrainstorm,
   deleteBrainstorm,
   getMessages,
-  sendMessage,
+  streamMessage,
+  updateTopic,
+  deleteTopic,
+  createTopic,
+  exploreTopic,
   getMap,
   refreshMap,
   getLibrary,
   updateLibraryEntry,
+  deleteLibraryEntry,
   updateBrainstormModel,
   buildBrainstormWebSocketUrl,
 } from './api';
@@ -92,7 +98,16 @@ function AppContent() {
   const [chatError, setChatError] = useState('');
   const [exploringTopic, setExploringTopic] = useState(null);
   const [hasClassified, setHasClassified] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState(null);
   const wsRef = useRef(null);
+  const streamAbortRef = useRef(null);
+  const sendingRef = useRef(false);
+  const activeBrainstormRef = useRef(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeBrainstormRef.current = activeBrainstorm;
+  }, [activeBrainstorm]);
 
   const loadBrainstorms = useCallback(async () => {
     try { const res = await listBrainstorms(); setBrainstorms(res.data); return res.data; }
@@ -193,16 +208,30 @@ function AppContent() {
     };
   }, [activeBrainstorm, loadMap, loadLibrary, loadBrainstorms]);
 
-  const handleNewBrainstorm = async () => {
-    try {
-      const res = await createBrainstorm({ title: 'New Brainstorm' });
-      setActiveBrainstorm(res.data); setMessages([]); setMapData({ topics: [], edges: [], suggestions: [] });
-      setLibraryData([]); setChatError(''); setActiveTab('map');
-      await loadBrainstorms();
-    } catch (err) { console.error(err); }
-  };
+  const handleNewBrainstorm = useCallback(() => {
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
+    setSending(false);
+    setSelectedTopic(null);
+    setActiveBrainstorm(null);
+    setMessages([]);
+    setMapData({ topics: [], edges: [], suggestions: [] });
+    setLibraryData([]);
+    setChatError('');
+    setExploringTopic(null);
+    setHasClassified(false);
+    setActiveTab('map');
+  }, []);
 
   const handleSelectBrainstorm = useCallback(async (brainstorm) => {
+    // Abort any in-flight stream before switching
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
+    setSending(false);
     const full = await loadBrainstormDetails(brainstorm.id);
     if (!full) return;
     setActiveBrainstorm(full); setActiveTab('map');
@@ -249,25 +278,61 @@ function AppContent() {
   };
 
   const submitBrainstormMessage = useCallback(async (content) => {
-    console.log('[DEBUG] submitBrainstormMessage called, content:', content.slice(0, 60), 'activeBrainstorm:', !!activeBrainstorm, 'sending:', sending);
-    if (!activeBrainstorm || sending) return;
-    setSending(true); setChatError('');
-    try {
-      const thinkingMessageId = `thinking-${Date.now()}`;
-      const userMsg = { id: Date.now().toString(), brainstorm_id: activeBrainstorm.id, role: 'user', content, created_at: new Date().toISOString() };
-      setMessages(p => [...p, userMsg]);
-      setMessages(p => [...p, { id: thinkingMessageId, brainstorm_id: activeBrainstorm.id, role: 'assistant', content: 'Thinking', isThinking: true, created_at: new Date().toISOString() }]);
-      const res = await sendMessage({ brainstorm_id: activeBrainstorm.id, message: content });
-      const aiMsg = { id: res.data.message_id, brainstorm_id: activeBrainstorm.id, role: 'assistant', content: res.data.response, created_at: new Date().toISOString() };
-      setMessages(p => p.map(msg => (msg.id === thinkingMessageId ? aiMsg : msg)));
-      // Map + library will be refreshed by WebSocket event after Celery finishes classification
-      await loadBrainstorms();
-    } catch (err) {
-      setMessages(p => p.filter(msg => !msg.isThinking));
-      const apiError = err?.response?.data?.detail || err?.message || 'Failed to send message.';
-      setChatError(apiError);
-    } finally { setSending(false); }
-  }, [activeBrainstorm, sending, loadBrainstorms, loadMap, loadLibrary]);
+    const brainstorm = activeBrainstormRef.current;
+    console.log('[DEBUG] submitBrainstormMessage called, content:', content.slice(0, 60), 'brainstorm:', !!brainstorm, 'sending:', sendingRef.current);
+    if (!brainstorm || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    setChatError('');
+
+    const userMsgId = Date.now().toString();
+    const thinkingMessageId = `thinking-${userMsgId}`;
+    const userMsg = { id: userMsgId, brainstorm_id: brainstorm.id, role: 'user', content, created_at: new Date().toISOString() };
+
+    // Show user message + thinking placeholder immediately
+    setMessages(p => [...p, userMsg]);
+    setMessages(p => [...p, { id: thinkingMessageId, brainstorm_id: brainstorm.id, role: 'assistant', content: '', isThinking: true, isStreaming: true, created_at: new Date().toISOString() }]);
+
+    let streamedContent = '';
+    let firstToken = true;
+
+    const controller = streamMessage(
+      { brainstorm_id: brainstorm.id, message: content },
+      {
+        onToken: (token) => {
+          streamedContent += token;
+          setMessages(p => p.map(msg => {
+            if (msg.id === thinkingMessageId) {
+              return { ...msg, content: streamedContent, isThinking: firstToken };
+            }
+            return msg;
+          }));
+          firstToken = false;
+        },
+        onDone: () => {
+          setMessages(p => p.map(msg => {
+            if (msg.id === thinkingMessageId) {
+              return { ...msg, isThinking: false, isStreaming: false };
+            }
+            return msg;
+          }));
+          setSending(false);
+          sendingRef.current = false;
+          streamAbortRef.current = null;
+          loadBrainstorms();
+        },
+        onError: (error) => {
+          setMessages(p => p.filter(msg => msg.id !== thinkingMessageId));
+          setChatError(error);
+          setSending(false);
+          sendingRef.current = false;
+          streamAbortRef.current = null;
+        },
+      }
+    );
+
+    streamAbortRef.current = controller;
+  }, [loadBrainstorms]);
 
   const handleSendMessage = useCallback((content) => {
     void submitBrainstormMessage(content);
@@ -277,9 +342,20 @@ function AppContent() {
     console.log('[DEBUG] handleSuggestionClick called with:', topicName);
     // Show immediate feedback on the map that we're exploring this topic
     setExploringTopic(topicName);
-    // Send the topic name — the backend extracts it from the message
-    void submitBrainstormMessage(topicName);
+    // Phrase it like a prompt so the backend promotes the existing proposition
+    // instead of creating a brand-new topic from a generic classification pass.
+    void submitBrainstormMessage(`Tell me about ${topicName}`);
   }, [submitBrainstormMessage]);
+
+  // Abort any in-flight stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamAbortRef.current) {
+        streamAbortRef.current.abort();
+        streamAbortRef.current = null;
+      }
+    };
+  }, []);
 
   const handleModelChange = useCallback(async (model) => {
     if (!activeBrainstorm) return;
@@ -299,12 +375,47 @@ function AppContent() {
     catch (err) { console.error(err); }
   };
 
+  const handleTopicClick = useCallback((topic) => {
+    setSelectedTopic(topic);
+  }, []);
+
+  const handleCloseTopicPanel = useCallback(() => {
+    setSelectedTopic(null);
+  }, []);
+
+  const handleUpdateTopic = useCallback(async (topicId, data) => {
+    if (!activeBrainstorm) return;
+    await updateTopic(activeBrainstorm.id, topicId, data);
+    const mapRes = await getMap(activeBrainstorm.id);
+    setMapData(mapRes.data);
+    const fresh = mapRes.data?.topics?.find(t => t.id === topicId);
+    if (fresh) setSelectedTopic(fresh);
+  }, [activeBrainstorm]);
+
+  const handleDeleteTopic = useCallback(async (topicId) => {
+    if (!activeBrainstorm) return;
+    await deleteTopic(activeBrainstorm.id, topicId);
+    setSelectedTopic(null);
+    await loadMap(activeBrainstorm.id);
+    await loadLibrary(activeBrainstorm.id);
+  }, [activeBrainstorm, loadMap, loadLibrary]);
+
+  const handleExploreTopic = useCallback(async (topicId) => {
+    if (!activeBrainstorm) return;
+    const res = await exploreTopic(activeBrainstorm.id, topicId);
+    setMapData(res.data);
+    await loadLibrary(activeBrainstorm.id);
+  }, [activeBrainstorm, loadLibrary]);
+
+  const handleSwitchToLibrary = useCallback(() => {
+    setActiveTab('library');
+  }, []);
+
   const handleStartNewBrainstorm = useCallback(async (topic) => {
     console.log('[DEBUG] handleStartNewBrainstorm called with topic:', topic);
     try {
       const res = await createBrainstorm({ title: topic });
       console.log('[DEBUG] createBrainstorm response:', JSON.stringify(res.data));
-      const brainstormId = res.data.id;
       setActiveBrainstorm(res.data);
       setMessages([]);
       setMapData({ topics: [], edges: [], suggestions: [] });
@@ -312,18 +423,20 @@ function AppContent() {
       setChatError('');
       setActiveTab('map');
       await loadBrainstorms();
-      console.log('[DEBUG] Sending topic message for brainstorm:', brainstormId);
-      // Send just the topic name — the backend uses this for the node label
-      await sendMessage({ brainstorm_id: brainstormId, message: topic });
-      console.log('[DEBUG] Topic message sent for brainstorm:', brainstormId);
-      await loadBrainstorms();
+      // Use streaming — the topic message gets the same real-time treatment
+      submitBrainstormMessage(topic);
     } catch (err) {
       console.error('Failed to start brainstorm:', err);
     }
-  }, [loadBrainstorms]);
+  }, [loadBrainstorms, submitBrainstormMessage]);
 
   const handleUpdateLibraryEntry = async (entryId, content) => {
     try { await updateLibraryEntry(entryId, content); await loadLibrary(activeBrainstorm.id); }
+    catch (err) { console.error(err); }
+  };
+
+  const handleDeleteLibraryEntry = async (entryId) => {
+    try { await deleteLibraryEntry(entryId); await loadLibrary(activeBrainstorm.id); }
     catch (err) { console.error(err); }
   };
 
@@ -359,19 +472,38 @@ function AppContent() {
           onRenameComplete={() => setReloadKey(k => k + 1)}
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative', zIndex: 1 }}>
-          <ChatWindow
-            activeBrainstorm={activeBrainstorm}
-            mapData={mapData} libraryData={libraryData}
-            activeTab={activeTab} onTabChange={setActiveTab}
-            onRefreshMap={handleRefreshMap}
-            onUpdateLibraryEntry={handleUpdateLibraryEntry}
-            onStartNewBrainstorm={handleStartNewBrainstorm}
-            onSuggestionClick={handleSuggestionClick}
-            exploringTopic={exploringTopic}
-            hasClassified={hasClassified}
-            themeId={themeId} onThemeChange={handleThemeChange}
-            onModelChange={handleModelChange}
-          />
+          <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <ChatWindow
+                activeBrainstorm={activeBrainstorm}
+                mapData={mapData} libraryData={libraryData}
+                activeTab={activeTab} onTabChange={setActiveTab}
+                onRefreshMap={handleRefreshMap}
+                onUpdateLibraryEntry={handleUpdateLibraryEntry}
+                onDeleteLibraryEntry={handleDeleteLibraryEntry}
+                onStartNewBrainstorm={handleStartNewBrainstorm}
+                onSuggestionClick={handleSuggestionClick}
+                onTopicClick={handleTopicClick}
+                selectedTopic={selectedTopic}
+                exploringTopic={exploringTopic}
+                hasClassified={hasClassified}
+                themeId={themeId} onThemeChange={handleThemeChange}
+                onModelChange={handleModelChange}
+              />
+            </Box>
+            {selectedTopic && (
+              <TopicDetailPanel
+                topic={selectedTopic}
+                mapData={mapData}
+                libraryData={libraryData}
+                onClose={handleCloseTopicPanel}
+                onUpdate={handleUpdateTopic}
+                onDelete={handleDeleteTopic}
+                onExplore={handleExploreTopic}
+                onSwitchToLibrary={handleSwitchToLibrary}
+              />
+            )}
+          </Box>
         </Box>
       </Box>
 

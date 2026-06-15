@@ -44,6 +44,16 @@ class TopicRenameRequest(BaseModel):
     name: str
 
 
+class TopicUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class TopicCreateRequest(BaseModel):
+    name: str
+    description: str = ""
+
+
 class MapConnectionCreateRequest(BaseModel):
     source_topic_id: uuid.UUID
     target_topic_id: uuid.UUID

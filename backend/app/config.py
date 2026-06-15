@@ -13,8 +13,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://raguser:ragpassword@local
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+ANTHROPIC_API_VERSION = os.getenv("ANTHROPIC_API_VERSION", "2024-02-15")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "2048"))      # max tokens to generate
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))              # context window size
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")              # keep model loaded in RAM
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "ollama/llama3.2:1b")
+CLASSIFICATION_MODEL = os.getenv("CLASSIFICATION_MODEL", "")           # optional smaller model for classification tasks
 
 # ─── CORS ─────────────────────────────────────────────────────
 _CORS_DEFAULT = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://frontend:5173"

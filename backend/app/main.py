@@ -2,12 +2,14 @@ import logging
 import uuid
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.api import brainstorms, chat, map, library, realtime, models, health, settings, export, auth, share
 from app.config import (
     APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS, validate_config,
 )
 from app.logging_config import configure_logging, set_request_id
+from app.rate_limit import RateLimitMiddleware
 
 # Initialize structured logging
 configure_logging()
@@ -29,6 +31,24 @@ app = FastAPI(
     version=APP_VERSION,
 )
 
+# ── Body size limit ──────────────────────────────────────────
+# Reject requests with bodies larger than 1 MB before any
+# processing to prevent memory exhaustion from oversized payloads.
+_MAX_BODY_BYTES = 1_048_576  # 1 MB
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and content_length.isdigit():
+            if int(content_length) > _MAX_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"Request body too large. Maximum is {_MAX_BODY_BYTES // 1_048_576} MB."},
+                )
+        return await call_next(request)
+
+app.add_middleware(BodySizeLimitMiddleware)
+
 # Request ID middleware — tags every request for log traceability
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -39,6 +59,9 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(RequestIDMiddleware)
+
+# Rate limiting — Redis-backed sliding window per client IP + route
+app.add_middleware(RateLimitMiddleware)
 
 # CORS middleware — configurable via CORS_ORIGINS env var
 app.add_middleware(

@@ -1,20 +1,44 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Box, Typography, Accordion, AccordionSummary, AccordionDetails,
-    TextField, IconButton, Tooltip, Chip, alpha, Divider,
+    TextField, IconButton, Tooltip, Chip, alpha, Button,
+    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
 import {
     Folder as FolderIcon, ExpandMore as ExpandIcon,
     Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon,
     Description as FileIcon, LibraryBooks as LibraryIcon,
-    Download as DownloadIcon,
+    Download as DownloadIcon, Delete as DeleteIcon,
+    Search as SearchIcon, Close as CloseIcon,
+    UnfoldMore as ExpandAllIcon, UnfoldLess as CollapseAllIcon,
 } from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
+import { exportMarkdown } from '../api';
 
-function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
+function LibraryTab({ libraryData, onUpdateEntry, brainstormId, onDeleteEntry }) {
     const [editingEntry, setEditingEntry] = useState(null);
     const [editContent, setEditContent] = useState('');
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [allExpanded, setAllExpanded] = useState(true);
+
+    // Filter by search query
+    const filteredData = useMemo(() => {
+        if (!searchQuery.trim()) return libraryData;
+        const q = searchQuery.toLowerCase();
+        return libraryData
+            .map(folder => ({
+                ...folder,
+                entries: folder.entries.filter(e =>
+                    e.file_name.toLowerCase().includes(q) ||
+                    (e.content || '').toLowerCase().includes(q)
+                ),
+            }))
+            .filter(folder => folder.entries.length > 0);
+    }, [libraryData, searchQuery]);
 
     const totalEntries = libraryData.reduce((sum, folder) => sum + folder.entries.length, 0);
+    const visibleEntries = filteredData.reduce((sum, folder) => sum + folder.entries.length, 0);
 
     const handleStartEdit = (entry) => {
         setEditingEntry(entry.id);
@@ -34,14 +58,22 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
         setEditContent('');
     };
 
+    const handleDelete = async () => {
+        if (deleteTarget) {
+            await onDeleteEntry(deleteTarget);
+            setDeleteTarget(null);
+        }
+    };
+
+    const toggleExpandAll = () => setAllExpanded(prev => !prev);
+
     return (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* ── Header ─────────────────────────────────────── */}
             <Box sx={(theme) => ({
                 px: 3, py: 1.75,
-                borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5),
                 bgcolor: alpha(theme.palette.background.default, 0.3),
-                display: 'flex', alignItems: 'center', gap: 1.5,
+                display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
             })}>
                 <Box sx={(theme) => ({
                     width: 28, height: 28, borderRadius: 1.5,
@@ -62,38 +94,84 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                             '& .MuiChip-label': { px: 0.8 },
                         })} />
                 )}
-                {totalEntries > 0 && brainstormId && (
-                    <IconButton
-                        size="small"
-                        onClick={async () => {
-                            try {
-                                const res = await exportMarkdown(brainstormId);
-                                const url = window.URL.createObjectURL(new Blob([res.data]));
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = 'brainstorm_export.zip';
-                                a.click();
-                                window.URL.revokeObjectURL(url);
-                            } catch (err) {
-                                console.error('Export failed:', err);
-                            }
-                        }}
-                        sx={(theme) => ({
-                            ml: 'auto',
-                            width: 28, height: 28, borderRadius: 1,
-                            border: '1px solid', borderColor: alpha(theme.palette.divider, 0.5),
-                            color: alpha(theme.palette.text.secondary, 0.5),
-                            '&:hover': {
-                                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                color: theme.palette.primary.light,
-                                borderColor: alpha(theme.palette.primary.main, 0.15),
-                            },
-                        })}
-                    >
-                        <DownloadIcon sx={{ fontSize: 14 }} />
-                    </IconButton>
+                {totalEntries > 0 && (
+                    <>
+                        <Tooltip title={allExpanded ? 'Collapse all' : 'Expand all'} arrow>
+                            <IconButton onClick={toggleExpandAll} size="small"
+                                sx={(theme) => ({
+                                    width: 28, height: 28, borderRadius: 1,
+                                    color: alpha(theme.palette.text.secondary, 0.5),
+                                    '&:hover': {
+                                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                        color: theme.palette.primary.light,
+                                    },
+                                })}>
+                                {allExpanded ? <CollapseAllIcon sx={{ fontSize: 14 }} /> : <ExpandAllIcon sx={{ fontSize: 14 }} />}
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Export all as Markdown .zip" arrow>
+                            <IconButton
+                                size="small"
+                                onClick={async () => {
+                                    try {
+                                        const res = await exportMarkdown(brainstormId);
+                                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = 'brainstorm_export.zip';
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                    } catch (err) {
+                                        console.error('Export failed:', err);
+                                    }
+                                }}
+                                sx={(theme) => ({
+                                    ml: 'auto',
+                                    width: 28, height: 28, borderRadius: 1,
+                                    color: alpha(theme.palette.text.secondary, 0.5),
+                                    '&:hover': {
+                                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                        color: theme.palette.primary.light,
+                                        borderColor: alpha(theme.palette.primary.main, 0.15),
+                                    },
+                                })}
+                            >
+                                <DownloadIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </>
                 )}
             </Box>
+
+            {/* ── Search ──────────────────────────────────────── */}
+            {totalEntries > 3 && (
+                <Box sx={{ px: 2.5, pt: 1.5 }}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search entries..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        slotProps={{
+                            input: {
+                                startAdornment: <SearchIcon sx={(theme) => ({ fontSize: 16, color: alpha(theme.palette.text.secondary, 0.4), mr: 0.5 })} />,
+                                endAdornment: searchQuery ? (
+                                    <IconButton size="small" onClick={() => setSearchQuery('')} sx={{ p: 0.25 }}>
+                                        <CloseIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                ) : undefined,
+                                sx: (theme) => ({
+                                    borderRadius: 1.5,
+                                    fontSize: '0.8rem',
+                                    bgcolor: alpha(theme.palette.background.paper, 0.4),
+                                    '& fieldset': { border: 'none' },
+                                    '& input': { py: 0.75 },
+                                }),
+                            },
+                        }}
+                    />
+                </Box>
+            )}
 
             {/* ── Content ─────────────────────────────────────── */}
             <Box sx={(theme) => ({
@@ -128,16 +206,26 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                             </Typography>
                         </Box>
                     </Box>
+                ) : filteredData.length === 0 ? (
+                    <Box sx={(theme) => ({
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        height: '100%', flexDirection: 'column', gap: 2,
+                    })}>
+                        <SearchIcon sx={(theme) => ({ fontSize: 32, color: alpha(theme.palette.text.secondary, 0.3) })} />
+                        <Typography sx={(theme) => ({ color: alpha(theme.palette.text.secondary, 0.5), fontSize: '0.85rem' })}>
+                            No entries match "{searchQuery}"
+                        </Typography>
+                    </Box>
                 ) : (
-                    libraryData.map((folder) => (
-                        <Accordion key={folder.folder_name} defaultExpanded
+                    filteredData.map((folder) => (
+                        <Accordion key={folder.folder_name} expanded={allExpanded} onChange={toggleExpandAll}
                             sx={(theme) => ({
                                 bgcolor: alpha(theme.palette.background.paper, 0.4),
                                 boxShadow: 'none',
-                                border: '1px solid',
-                                borderColor: alpha(theme.palette.divider, 0.5),
                                 borderRadius: '12px !important',
                                 overflow: 'hidden',
+                                border: '1px solid',
+                                borderColor: alpha(theme.palette.divider, 0.08),
                                 transition: 'border-color 0.2s ease',
                                 '&:hover': {
                                     borderColor: alpha(theme.palette.primary.main, 0.2),
@@ -158,7 +246,7 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                     <FolderIcon sx={(theme) => ({ color: theme.palette.primary.light, fontSize: 20, opacity: 0.85 })} />
                                     <Typography sx={{ fontWeight: 600, color: 'text.primary', fontSize: '0.825rem' }}>
-                                        {folder.folder_name}
+                                        {folder.folder_name.replace(/-/g, ' ')}
                                     </Typography>
                                     <Chip label={`${folder.entries.length} file${folder.entries.length !== 1 ? 's' : ''}`} size="small"
                                         sx={(theme) => ({
@@ -169,16 +257,15 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                                         })} />
                                 </Box>
                             </AccordionSummary>
-                            <AccordionDetails sx={(theme) => ({ pt: 0, pb: 2, px: 2 })}>
-                                <Divider sx={(theme) => ({ mb: 1.5, borderColor: alpha(theme.palette.divider, 0.5) })} />
+                            <AccordionDetails sx={{ pt: 0, pb: 2, px: 2 }}>
                                 {folder.entries.map((entry) => (
                                     <Box key={entry.id}
                                         sx={(theme) => ({
                                             mb: 1.5,
-                                            borderRadius: 2.5,
-                                            bgcolor: alpha(theme.palette.background.paper, 0.3),
+                                            borderRadius: 2,
+                                            bgcolor: alpha(theme.palette.background.paper, 0.5),
                                             border: '1px solid',
-                                            borderColor: alpha(theme.palette.divider, 0.4),
+                                            borderColor: alpha(theme.palette.divider, 0.06),
                                             overflow: 'hidden',
                                             transition: 'border-color 0.2s ease',
                                             '&:hover': {
@@ -191,12 +278,10 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                                         <Box sx={(theme) => ({
                                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                             px: 1.5, py: 1,
-                                            borderBottom: '1px solid',
-                                            borderColor: alpha(theme.palette.divider, 0.4),
-                                            bgcolor: alpha(theme.palette.action.hover, 0.3),
+                                            bgcolor: alpha(theme.palette.action.hover, 0.25),
                                         })}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                                                <FileIcon sx={(theme) => ({ fontSize: 14, color: alpha(theme.palette.text.secondary, 0.5), flexShrink: 0 })} />
+                                                <FileIcon sx={(theme) => ({ fontSize: 14, color: alpha(theme.palette.primary.light, 0.5), flexShrink: 0 })} />
                                                 <Typography variant="caption" sx={(theme) => ({
                                                     color: alpha(theme.palette.text.secondary, 0.8),
                                                     fontWeight: 600, fontSize: '0.7rem',
@@ -204,6 +289,14 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                                                 })}>
                                                     {entry.file_name}
                                                 </Typography>
+                                                {entry.created_at && (
+                                                    <Typography variant="caption" sx={(theme) => ({
+                                                        color: alpha(theme.palette.text.secondary, 0.35),
+                                                        fontSize: '0.6rem', flexShrink: 0,
+                                                    })}>
+                                                        {new Date(entry.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                                    </Typography>
+                                                )}
                                             </Box>
                                             <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
                                                 {editingEntry === entry.id ? (
@@ -230,19 +323,34 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                                                         </Tooltip>
                                                     </>
                                                 ) : (
-                                                    <Tooltip title="Edit content" arrow>
-                                                        <IconButton size="small" onClick={() => handleStartEdit(entry)}
-                                                            sx={(theme) => ({
-                                                                color: alpha(theme.palette.text.secondary, 0.4),
-                                                                width: 28, height: 28, borderRadius: 1,
-                                                                '&:hover': {
-                                                                    color: theme.palette.primary.light,
-                                                                    bgcolor: alpha(theme.palette.primary.main, 0.15),
-                                                                },
-                                                            })}>
-                                                            <EditIcon sx={{ fontSize: 14 }} />
-                                                        </IconButton>
-                                                    </Tooltip>
+                                                    <>
+                                                        <Tooltip title="Edit content" arrow>
+                                                            <IconButton size="small" onClick={() => handleStartEdit(entry)}
+                                                                sx={(theme) => ({
+                                                                    color: alpha(theme.palette.text.secondary, 0.4),
+                                                                    width: 28, height: 28, borderRadius: 1,
+                                                                    '&:hover': {
+                                                                        color: theme.palette.primary.light,
+                                                                        bgcolor: alpha(theme.palette.primary.main, 0.15),
+                                                                    },
+                                                                })}>
+                                                                <EditIcon sx={{ fontSize: 14 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Delete entry" arrow>
+                                                            <IconButton size="small" onClick={() => setDeleteTarget(entry.id)}
+                                                                sx={(theme) => ({
+                                                                    color: alpha(theme.palette.text.secondary, 0.3),
+                                                                    width: 28, height: 28, borderRadius: 1,
+                                                                    '&:hover': {
+                                                                        color: theme.palette.error.light,
+                                                                        bgcolor: alpha(theme.palette.error.main, 0.12),
+                                                                    },
+                                                                })}>
+                                                                <DeleteIcon sx={{ fontSize: 14 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </>
                                                 )}
                                             </Box>
                                         </Box>
@@ -270,15 +378,54 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                                             />
                                         ) : (
                                             <Box sx={(theme) => ({
-                                                fontFamily: '"JetBrains Mono", monospace',
-                                                fontSize: '0.78rem', lineHeight: 1.7,
-                                                color: alpha(theme.palette.text.primary, 0.8),
-                                                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                                                maxHeight: 300, overflow: 'auto',
+                                                fontSize: '0.82rem', lineHeight: 1.75,
+                                                color: theme.palette.text.primary,
+                                                maxHeight: 420, overflow: 'auto',
                                                 px: 2, py: 1.5,
                                                 '&::-webkit-scrollbar': { width: 4 },
+                                                '& h1, & h2, & h3, & h4': {
+                                                    mt: 2, mb: 0.75,
+                                                    fontWeight: 700,
+                                                    color: theme.palette.text.primary,
+                                                    '&:first-child': { mt: 0 },
+                                                },
+                                                '& h1': { fontSize: '1.2rem' },
+                                                '& h2': { fontSize: '1rem', color: theme.palette.primary.light },
+                                                '& h3': { fontSize: '0.9rem' },
+                                                '& p': { mb: 0.75 },
+                                                '& ul, & ol': { pl: 2.5, mb: 0.75 },
+                                                '& li': { mb: 0.25 },
+                                                '& code': {
+                                                    px: 0.6, py: 0.2,
+                                                    borderRadius: 0.75,
+                                                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.12 : 0.06),
+                                                    fontSize: '0.78rem',
+                                                    fontFamily: '"JetBrains Mono", monospace',
+                                                },
+                                                '& pre': {
+                                                    p: 1.5, borderRadius: 1.5,
+                                                    bgcolor: alpha(theme.palette.background.default, 0.6),
+                                                    overflow: 'auto',
+                                                    mb: 0.75,
+                                                },
+                                                '& pre code': {
+                                                    bgcolor: 'transparent', p: 0,
+                                                },
+                                                '& blockquote': {
+                                                    pl: 1.5,
+                                                    borderLeft: `3px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+                                                    color: alpha(theme.palette.text.secondary, 0.85),
+                                                    mb: 0.75,
+                                                },
+                                                '& strong': { fontWeight: 700, color: theme.palette.text.primary },
+                                                '& a': { color: theme.palette.primary.light },
+                                                '& hr': {
+                                                    border: 'none',
+                                                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                                                    my: 1.5,
+                                                },
                                             })}>
-                                                {entry.content}
+                                                <ReactMarkdown>{entry.content || '*No content yet.*'}</ReactMarkdown>
                                             </Box>
                                         )}
                                     </Box>
@@ -288,6 +435,25 @@ function LibraryTab({ libraryData, onUpdateEntry, brainstormId }) {
                     ))
                 )}
             </Box>
+
+            {/* ── Delete Confirmation Dialog ────────────────── */}
+            <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs">
+                <DialogTitle sx={{ fontWeight: 700, fontSize: '1rem' }}>Delete entry?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ fontSize: '0.8rem' }}>
+                        This will permanently remove this library entry. This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
+                    <Button onClick={() => setDeleteTarget(null)} sx={{ borderRadius: 1.5, textTransform: 'none', fontSize: '0.8rem' }}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleDelete} variant="contained" color="error"
+                        sx={{ borderRadius: 1.5, textTransform: 'none', fontSize: '0.8rem', fontWeight: 600 }}>
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

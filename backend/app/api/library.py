@@ -39,3 +39,17 @@ def update_library_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Library entry not found")
     return entry
+
+
+@router.delete("/entry/{entry_id}", status_code=204)
+def delete_library_entry(
+    entry_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    entry = library_service.get_library_entry(db, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Library entry not found")
+    db.delete(entry)
+    db.commit()
+    return None

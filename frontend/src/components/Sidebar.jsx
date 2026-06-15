@@ -7,7 +7,6 @@ import {
     ListItemText,
     ListItemIcon,
     IconButton,
-    Divider,
     Button,
     alpha,
     Chip,
@@ -80,8 +79,6 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                     flexDirection: 'column',
                     alignItems: 'center',
                     bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.75) : alpha(theme.palette.background.paper, 0.4),
-                    borderRight: '1px solid',
-                    borderColor: alpha(theme.palette.divider, 0.6),
                     transition: 'all 0.2s ease',
                     position: 'relative',
                     zIndex: 10,
@@ -172,8 +169,6 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                 display: 'flex',
                 flexDirection: 'column',
                 bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.75) : alpha(theme.palette.background.paper, 0.4),
-                borderRight: '1px solid',
-                borderColor: alpha(theme.palette.divider, 0.6),
                 transition: 'all 0.2s ease',
                 position: 'relative',
                 zIndex: 10,
@@ -256,40 +251,6 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                 </Tooltip>
             </Box>
 
-            <Divider sx={{ borderColor: (theme) => alpha(theme.palette.divider, 0.6) }} />
-
-            {/* ── New Brainstorm Button ───────────────────────── */}
-            <Box sx={{ px: 2, py: 2 }}>
-                <Button
-                    variant="contained"
-                    fullWidth
-                    startIcon={<AddIcon />}
-                    onClick={onNew}
-                    sx={(theme) => ({
-                        borderRadius: 1,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        fontSize: '0.85rem',
-                        py: 1.2,
-                        background: theme.palette.gradients.primary,
-                        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.28)}`,
-                        '&:hover': {
-                            background: theme.palette.gradients.primaryHover,
-                            boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.4)}`,
-                            transform: 'translateY(-1px)',
-                        },
-                        '&:active': {
-                            transform: 'translateY(0)',
-                            boxShadow: `0 1px 4px ${alpha(theme.palette.primary.main, 0.22)}`,
-                        },
-                    })}
-                >
-                    New Brainstorm
-                </Button>
-            </Box>
-
-            <Divider sx={{ borderColor: (theme) => alpha(theme.palette.divider, 0.6) }} />
-
             {/* ── Search Input ──────────────────────────────── */}
             <Box sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
                 <TextField
@@ -312,8 +273,6 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                                 borderRadius: 1,
                                 fontSize: '0.78rem',
                                 bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.6 : 0.5),
-                                border: '1px solid',
-                                borderColor: alpha(theme.palette.divider, 0.5),
                                 '& fieldset': { border: 'none' },
                                 '&:hover': {
                                     borderColor: alpha(theme.palette.primary.main, 0.2),
@@ -374,6 +333,47 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                     />
                 )}
             </Box>
+
+            <Tooltip title="New Brainstorm" arrow placement="right">
+                <Box
+                    role="button"
+                    tabIndex={0}
+                    onClick={onNew}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onNew();
+                        }
+                    }}
+                    sx={(theme) => ({
+                        mx: 2,
+                        mb: 1.25,
+                        height: 56,
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        border: '1px dashed',
+                        borderColor: alpha(theme.palette.primary.main, 0.28),
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        color: theme.palette.primary.light,
+                        transition: 'all 0.18s ease',
+                        boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.background.paper, 0.35)}`,
+                        '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.14),
+                            borderColor: alpha(theme.palette.primary.main, 0.45),
+                            transform: 'translateY(-1px)',
+                        },
+                        '&:focus-visible': {
+                            outline: 'none',
+                            boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}`,
+                        },
+                    })}
+                >
+                    <AddIcon sx={{ fontSize: 28 }} />
+                </Box>
+            </Tooltip>
 
             {/* ── Brainstorm List ─────────────────────────────── */}
             <List sx={{ flex: 1, overflow: 'auto', px: 1.5, pb: 2, '& > :last-child': { mb: 0 } }}>
@@ -515,7 +515,7 @@ function ListItemWrapper({ brainstorm: b, isActive, onSelect, onStartEdit, onDel
                 ) : (
                     <ListItemText
                         primary={b.title}
-                        secondary={`${b.message_count} message${b.message_count !== 1 ? 's' : ''}`}
+                        secondary={`${b.explored_topic_count ?? b.message_count ?? 0} explored topic${(b.explored_topic_count ?? b.message_count ?? 0) !== 1 ? 's' : ''}`}
                         slotProps={{
                             primary: {
                                 variant: 'body2',

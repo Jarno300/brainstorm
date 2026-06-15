@@ -55,6 +55,16 @@ LOGGING_CONFIG = {
             "handlers": ["console"],
             "propagate": False,
         },
+        "app.services": {
+            "level": LOG_LEVEL,
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "app.tasks": {
+            "level": LOG_LEVEL,
+            "handlers": ["console"],
+            "propagate": False,
+        },
     },
     "root": {
         "level": LOG_LEVEL,

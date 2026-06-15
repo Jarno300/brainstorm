@@ -4,16 +4,15 @@ Celery tasks for processing chat messages:
 2. Generate library entries (markdown files)
 3. Propose related topics for the map
 """
+import logging
+import time
 import uuid
 import re
 from datetime import datetime, timezone
 from app.tasks.celery_app import celery_app
 from app.database import SessionLocal
 from app.models.message import Message
-from app.services.classification_service import (
-    classify_topics,
-    generate_library_entry,
-)
+from app.services.classification_service import extract_topics
 from app.services.topic_service import (
     create_topic,
     get_topics,
@@ -26,6 +25,8 @@ from app.services.topic_service import (
 from app.services.map_suggestion_service import rebuild_map_suggestions
 from app.services.library_service import create_library_entry
 from app.services.brainstorm_service import get_brainstorm, update_brainstorm_title
+
+logger = logging.getLogger(__name__)
 
 
 STOPWORDS = {
@@ -60,6 +61,7 @@ PROMPT_TOPIC_PATTERNS = [
 
 def clean_topic_candidate(candidate: str) -> str:
     cleaned = candidate.strip(" .,:;!?\"'()[]{}")
+    cleaned = re.sub(r'\*\*?|__?|`', '', cleaned)   # strip markdown
     cleaned = re.sub(r"\b(?:please|kindly)\b", "", cleaned).strip()
     cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = re.sub(r"^(?:the|a|an)\s+", "", cleaned)
@@ -163,7 +165,9 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
         commit=False,
     )
 
-    md_content = generate_library_entry(promoted_topic.name, conversation_text)
+    # Use the last assistant response as the library entry — no re-summarization
+    assistant_msgs = [m for m in messages if m.role.value == "assistant" and m.content.strip()]
+    md_content = assistant_msgs[-1].content if assistant_msgs else f"# {promoted_topic.name}\n\n*No content yet.*"
     file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
     entry = create_library_entry(
         db=db,
@@ -176,7 +180,6 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
     )
 
     promoted_topic.library_path = entry.file_path
-
     promote_suggestion_edges_to_related(db, brainstorm_id, promoted_topic.id, commit=False)
     rebuild_propositions_and_title(db, brainstorm_id, title_candidate={"name": promoted_topic.name})
 
@@ -187,7 +190,12 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
 
 
 def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, conversation_text: str):
-    classified_topics = classify_topics(conversation_text)
+    """Extract topics from conversation and create them with library entries.
+
+    Uses the simple comma-separated extraction (1 LLM call) and the
+    last AI response as the library entry (no re-summarization).
+    """
+    topic_names = extract_topics(conversation_text)
     primary_topic_name = infer_primary_topic_name(messages)
     existing_topics = get_topics(db, brainstorm_id)
     existing_topic_names = {
@@ -196,81 +204,86 @@ def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, co
         if not t.is_proposition
     }
 
-    if not classified_topics:
+    # Use the last assistant message as the library entry content
+    assistant_msgs = [m for m in messages if m.role.value == "assistant" and m.content.strip()]
+    assistant_content = assistant_msgs[-1].content if assistant_msgs else ""
+
+    if not topic_names:
         if primary_topic_name:
-            classified_topics = [{
-                "name": primary_topic_name,
-                "description": "Primary topic inferred from the user's question.",
-                "confidence": 0.6,
-            }]
+            topic_names = [primary_topic_name.lower().replace(" ", "-")]
         else:
             return []
 
     created_topics = []
-    for index, topic_data in enumerate(classified_topics):
-        topic_name = topic_data.get("name", "unknown-topic").lower().replace(" ", "-")
-
+    for index, name in enumerate(topic_names):
+        # Primary topic takes priority
         if index == 0 and primary_topic_name:
-            topic_name = primary_topic_name.lower().replace(" ", "-")
+            name = primary_topic_name.lower().replace(" ", "-")
 
-        if topic_name in existing_topic_names:
+        if name in existing_topic_names:
             continue
 
-        md_content = generate_library_entry(topic_name, conversation_text)
+        # First topic becomes a main node; rest become suggestion propositions
+        is_prop = index > 0
+
         topic = create_topic(
             db=db,
             brainstorm_id=brainstorm_id,
-            name=topic_name,
-            description=topic_data.get("description", ""),
-            is_proposition=False,
-            confidence=topic_data.get("confidence", 0.5),
+            name=name,
+            description=f"Explored during conversation.",
+            is_proposition=is_prop,
+            confidence=0.6 if not is_prop else 0.3,
             commit=False,
         )
 
-        file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-        entry = create_library_entry(
-            db=db,
-            brainstorm_id=brainstorm_id,
-            topic_id=topic.id,
-            folder_name=topic_name,
-            file_name=file_name,
-            content=md_content,
-            commit=False,
-        )
-
-        topic.library_path = entry.file_path
+        # Only create library entries for main topics (not propositions)
+        if not is_prop:
+            md_content = assistant_content if assistant_content else f"# {name}\n\n*This topic was discussed in the conversation.*"
+            file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
+            entry = create_library_entry(
+                db=db,
+                brainstorm_id=brainstorm_id,
+                topic_id=topic.id,
+                folder_name=name,
+                file_name=file_name,
+                content=md_content,
+                commit=False,
+            )
+            topic.library_path = entry.file_path
 
         created_topics.append({
             "id": str(topic.id),
-            "name": topic_name,
-            "library_path": entry.file_path,
+            "name": name,
+            "library_path": topic.library_path or "",
+            "is_proposition": is_prop,
         })
+        existing_topic_names.add(name)
 
-        existing_topic_names.add(topic_name)
-
-    for i in range(len(created_topics)):
-        for j in range(i + 1, len(created_topics)):
-            t1 = created_topics[i]
-            t2 = created_topics[j]
-            create_edge(
-                db=db,
-                brainstorm_id=brainstorm_id,
-                source_topic_id=uuid.UUID(t1["id"]),
-                target_topic_id=uuid.UUID(t2["id"]),
-                relationship="related",
-                weight=0.5,
-                commit=False,
-            )
+    # Create suggestion edges from the main topic to each proposition
+    if created_topics:
+        main_id = created_topics[0]["id"]
+        for t in created_topics[1:]:
+            if t.get("is_proposition"):
+                create_edge(
+                    db=db,
+                    brainstorm_id=brainstorm_id,
+                    source_topic_id=uuid.UUID(main_id),
+                    target_topic_id=uuid.UUID(t["id"]),
+                    relationship="suggestion",
+                    weight=0.3,
+                    commit=False,
+                )
 
     rebuild_propositions_and_title(db, brainstorm_id, title_candidate=created_topics[0] if created_topics else None)
-
     db.commit()
-
     return created_topics
 
 
 def _process_message_classification(db, brainstorm_id: uuid.UUID):
     """Run the classification pipeline against the supplied DB session."""
+    t0 = time.perf_counter()
+    logger.debug("classification_pipeline start | brainstorm_id=%s", brainstorm_id)
+
     messages = (
         db.query(Message)
         .filter(Message.brainstorm_id == brainstorm_id)
@@ -279,12 +292,18 @@ def _process_message_classification(db, brainstorm_id: uuid.UUID):
     )
 
     if not messages:
+        logger.debug("classification_pipeline skip | brainstorm_id=%s no_messages", brainstorm_id)
         return {"status": "no_messages"}
 
     conversation_text = build_conversation_text(messages)
+    logger.debug("classification_pipeline conv | brainstorm_id=%s msgs=%d chars=%d",
+                 brainstorm_id, len(messages), len(conversation_text))
 
     promoted_topic = promote_clicked_suggestion(db, brainstorm_id, messages, conversation_text)
     if promoted_topic:
+        elapsed = time.perf_counter() - t0
+        logger.debug("classification_pipeline done  | brainstorm_id=%s elapsed=%.2fs promoted=%s",
+                     brainstorm_id, elapsed, promoted_topic.name)
         return {
             "status": "success",
             "topics_created": 0,
@@ -297,8 +316,13 @@ def _process_message_classification(db, brainstorm_id: uuid.UUID):
 
     created_topics = create_topics_from_classification(db, brainstorm_id, messages, conversation_text)
     if not created_topics:
+        elapsed = time.perf_counter() - t0
+        logger.warning("classification_pipeline fail | brainstorm_id=%s elapsed=%.2fs no_topics", brainstorm_id, elapsed)
         return {"status": "no_topics_found"}
 
+    elapsed = time.perf_counter() - t0
+    logger.debug("classification_pipeline done  | brainstorm_id=%s elapsed=%.2fs topics=%d",
+                 brainstorm_id, elapsed, len(created_topics))
     return {
         "status": "success",
         "topics_created": len(created_topics),

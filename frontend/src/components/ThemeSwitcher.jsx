@@ -19,8 +19,6 @@ function ThemeSwitcher({ themeId, onThemeChange }) {
         size="small"
         sx={(theme) => ({
           width: 30, height: 30, borderRadius: 1,
-          border: '1px solid',
-          borderColor: alpha(theme.palette.divider, 0.6),
           color: alpha(theme.palette.text.secondary, 0.55),
           transition: 'all 0.2s ease',
           '&:hover': {
@@ -46,8 +44,6 @@ function ThemeSwitcher({ themeId, onThemeChange }) {
               mt: 0.5,
               minWidth: 220,
               borderRadius: 1.5,
-              border: '1px solid',
-              borderColor: alpha(theme.palette.divider, 0.6),
               bgcolor: theme.palette.background.paper,
               boxShadow: isDark
                 ? '0 8px 32px rgba(0,0,0,0.4)'

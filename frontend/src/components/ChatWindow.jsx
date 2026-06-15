@@ -10,7 +10,7 @@ import LibraryTab from './LibraryTab';
 
 const MapTab = lazy(() => import('./MapTab'));
 
-function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabChange, onRefreshMap, onUpdateLibraryEntry, onSuggestionClick, exploringTopic, hasClassified, themeId, onThemeChange, onModelChange, onStartNewBrainstorm }) {
+function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabChange, onRefreshMap, onUpdateLibraryEntry, onDeleteLibraryEntry, onSuggestionClick, onTopicClick, selectedTopic, exploringTopic, hasClassified, themeId, onThemeChange, onModelChange, onStartNewBrainstorm }) {
     const [addModelOpen, setAddModelOpen] = useState(false);
     const [shareOpen, setShareOpen] = useState(false);
     const [refreshModels, setRefreshModels] = useState(null);
@@ -30,7 +30,6 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
             {/* ── Header ──────────────────────────────────────────── */}
             <Box sx={(theme) => ({
                 px: 3, py: 1.75,
-                borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5),
                 bgcolor: alpha(theme.palette.background.default, 0.6),
                 backdropFilter: 'blur(12px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -66,7 +65,6 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                             onClick={() => setShareOpen(true)}
                             sx={(t) => ({
                                 width: 30, height: 30, borderRadius: 1,
-                                border: '1px solid', borderColor: alpha(t.palette.divider, 0.6),
                                 color: alpha(t.palette.text.secondary, 0.55),
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
@@ -92,7 +90,6 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                 <>
                     {/* ── Tabs ────────────────────────────────────────────── */}
                     <Box sx={(theme) => ({
-                        borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5),
                         bgcolor: alpha(theme.palette.background.default, 0.3),
                     })}>
                         <Tabs value={activeTab} onChange={(e, v) => onTabChange(v)}
@@ -179,8 +176,6 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                                             borderRadius: 2,
                                             fontSize: '1rem',
                                             bgcolor: alpha(theme.palette.background.paper, 0.5),
-                                            border: '1.5px solid',
-                                            borderColor: alpha(theme.palette.divider, 0.5),
                                             transition: 'all 0.2s ease',
                                             '&:hover': {
                                                 borderColor: alpha(theme.palette.primary.main, 0.3),
@@ -252,8 +247,6 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                                         fontWeight: 500,
                                         bgcolor: alpha(theme.palette.action.hover, 0.4),
                                         color: alpha(theme.palette.text.secondary, 0.7),
-                                        border: '1px solid',
-                                        borderColor: alpha(theme.palette.divider, 0.4),
                                         transition: 'all 0.15s ease',
                                         '&:hover': {
                                             bgcolor: alpha(theme.palette.primary.main, 0.12),
@@ -267,20 +260,20 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                     </Box>
                 ) : (
                     <>
-                            {activeTab === 'map' && (
+                        {activeTab === 'map' && (
                             <ErrorBoundary fallbackTitle="Map unavailable" fallbackMessage="An error occurred loading the knowledge map. Try refreshing the map.">
                                 <Suspense fallback={
                                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                         <CircularProgress size={32} sx={(t) => ({ color: t.palette.primary.light })} />
                                     </Box>
                                 }>
-                                    <MapTab mapData={mapData} onRefresh={onRefreshMap} onSuggestionClick={onSuggestionClick} brainstormTitle={activeBrainstorm?.title} exploringTopic={exploringTopic} hasClassified={hasClassified} />
+                                    <MapTab mapData={mapData} onRefresh={onRefreshMap} onSuggestionClick={onSuggestionClick} onTopicClick={onTopicClick} selectedTopic={selectedTopic} brainstormTitle={activeBrainstorm?.title} exploringTopic={exploringTopic} hasClassified={hasClassified} />
                                 </Suspense>
                             </ErrorBoundary>
                         )}
                         {activeTab === 'library' && (
                             <ErrorBoundary fallbackTitle="Library unavailable" fallbackMessage="An error occurred loading the library. Please try again.">
-                                <LibraryTab libraryData={libraryData} onUpdateEntry={onUpdateLibraryEntry} brainstormId={activeBrainstorm?.id} />
+                                <LibraryTab libraryData={libraryData} onUpdateEntry={onUpdateLibraryEntry} onDeleteEntry={onDeleteLibraryEntry} brainstormId={activeBrainstorm?.id} />
                             </ErrorBoundary>
                         )}
                     </>
