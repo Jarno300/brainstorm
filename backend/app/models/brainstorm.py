@@ -13,7 +13,7 @@ class Brainstorm(Base):
     title = Column(String(255), default="New Brainstorm", index=True)
     created_at = Column(DateTime, default=utcnow, index=True)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
-    model = Column(String(100), default="ollama/llama3.2:1b")
+    model = Column(String(100), default="deepseek/deepseek-chat")
     is_active = Column(Boolean, default=True)
     summary = Column(Text, default="")
     share_token = Column(UUID(as_uuid=True), nullable=True, unique=True, default=None, index=True)

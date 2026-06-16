@@ -1,8 +1,10 @@
 import os
 import logging.config
+import time as _time_module
 
 # ─── Log Level ──────────────────────────────────────────────
 LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
+LOG_FORMAT = os.getenv("APP_LOG_FORMAT", "text").lower()  # "text" or "json"
 APP_ENV = os.getenv("APP_ENV", "development")
 
 # ─── Log Format ─────────────────────────────────────────────
@@ -12,15 +14,19 @@ VERBOSE_FORMAT = (
     "%(request_id)s | %(message)s"
 )
 
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {
-        "request_id": {
-            "()": "app.logging_config.RequestIDFilter",
-        },
-    },
-    "formatters": {
+
+def _choose_formatters():
+    """Select formatter classes based on LOG_FORMAT env var."""
+    if LOG_FORMAT == "json":
+        return {
+            "verbose": {
+                "()": "pythonjsonlogger.json.JsonFormatter",
+                "format": "%(asctime)s %(levelname)s %(name)s %(filename)s %(lineno)d %(request_id)s %(message)s",
+                "timestamp": True,
+            },
+        }
+    # Text formatters
+    return {
         "simple": {
             "format": SIMPLE_FORMAT,
             "datefmt": "%Y-%m-%d %H:%M:%S",
@@ -29,13 +35,24 @@ LOGGING_CONFIG = {
             "format": VERBOSE_FORMAT if APP_ENV != "development" else SIMPLE_FORMAT,
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
+    }
+
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "app.logging_config.RequestIDFilter",
+        },
     },
+    "formatters": _choose_formatters(),
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "level": LOG_LEVEL,
             "formatter": "verbose",
-            "filters": ["request_id"] if APP_ENV != "development" else [],
+            "filters": ["request_id"] if APP_ENV != "development" or LOG_FORMAT == "json" else [],
             "stream": "ext://sys.stdout",
         },
     },

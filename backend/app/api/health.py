@@ -6,7 +6,7 @@ from app.config import (
     OLLAMA_BASE_URL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
 )
 
-router = APIRouter(prefix="/api/health", tags=["health"])
+router = APIRouter(prefix="/health", tags=["health"])
 
 _startup_time = get_startup_timestamp()
 
@@ -26,7 +26,7 @@ def _check_redis():
     """Check Redis connectivity (non-fatal)."""
     try:
         import redis
-        r = redis.from_url(REDIS_URL)
+        r = redis.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
         r.ping()
         return {"status": "healthy"}
     except Exception as e:
@@ -89,14 +89,22 @@ def health_check():
 
 @router.get("/ready")
 def readiness_check():
-    """Kubernetes-style readiness: DB must be reachable. No external deps."""
+    """Kubernetes-style readiness: DB must be reachable.
+
+    Redis is optional in development mode (it powers Celery and real-time
+    updates but the app can function without it).
+    """
+    from app.config import APP_ENV
+
     db = _check_db()
     if db["status"] != "healthy":
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail="Database unavailable")
-    # Also verify Redis for Celery
+
+    # Redis is required in production, optional in development
     redis_status = _check_redis()
-    if redis_status["status"] == "unavailable":
+    if redis_status["status"] == "unavailable" and APP_ENV not in ("development",):
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail=f"Redis unavailable: {redis_status.get('detail', 'unknown')}")
+
     return {"status": "ready"}

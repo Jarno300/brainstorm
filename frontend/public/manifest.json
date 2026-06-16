@@ -1,0 +1,18 @@
+{
+  "name": "Brainstorm",
+  "short_name": "Brainstorm",
+  "description": "AI Chat Platform with Knowledge Mapping",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0D14",
+  "theme_color": "#CA6F4E",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -9,11 +9,16 @@ from app.services import library_service, brainstorm_service
 from app.api.auth import get_current_user
 from app.models.user import User
 
-router = APIRouter(prefix="/api/library", tags=["library"])
+router = APIRouter(prefix="/library", tags=["library"])
 
 
 @router.get("/{brainstorm_id}", response_model=List[LibraryFolderResponse])
-def get_library(brainstorm_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_library(
+    brainstorm_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all library folders and their entries for a brainstorm."""
     brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
     if not brainstorm:
         raise HTTPException(status_code=404, detail="Brainstorm not found")
@@ -22,9 +27,13 @@ def get_library(brainstorm_id: uuid.UUID, db: Session = Depends(get_db), current
 
 
 @router.get("/entry/{entry_id}", response_model=LibraryEntryResponse)
-def get_library_entry(entry_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_library_entry(entry_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     entry = library_service.get_library_entry(db, entry_id)
     if not entry:
+        raise HTTPException(status_code=404, detail="Library entry not found")
+    # Verify ownership via the brainstorm
+    brainstorm = brainstorm_service.get_brainstorm(db, entry.brainstorm_id, user_id=current_user.id)
+    if not brainstorm:
         raise HTTPException(status_code=404, detail="Library entry not found")
     return entry
 
@@ -34,7 +43,15 @@ def update_library_entry(
     entry_id: uuid.UUID,
     data: LibraryUpdateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    entry = library_service.get_library_entry(db, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Library entry not found")
+    # Verify ownership via the brainstorm
+    brainstorm = brainstorm_service.get_brainstorm(db, entry.brainstorm_id, user_id=current_user.id)
+    if not brainstorm:
+        raise HTTPException(status_code=404, detail="Library entry not found")
     entry = library_service.update_library_entry(db, entry_id, data.content)
     if not entry:
         raise HTTPException(status_code=404, detail="Library entry not found")
@@ -49,6 +66,10 @@ def delete_library_entry(
 ):
     entry = library_service.get_library_entry(db, entry_id)
     if not entry:
+        raise HTTPException(status_code=404, detail="Library entry not found")
+    # Verify ownership via the brainstorm
+    brainstorm = brainstorm_service.get_brainstorm(db, entry.brainstorm_id, user_id=current_user.id)
+    if not brainstorm:
         raise HTTPException(status_code=404, detail="Library entry not found")
     db.delete(entry)
     db.commit()

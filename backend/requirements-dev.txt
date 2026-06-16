@@ -1,0 +1,12 @@
+# ── Dev / test dependencies ──────────────────────────────────
+# Install with: pip install -r requirements-dev.txt
+# (These are in addition to requirements.txt)
+
+-r requirements.txt
+
+pytest==8.4.2
+pytest-asyncio==1.2.0
+pytest-cov==6.2.1
+httpx==0.28.1               # already in requirements.txt, but needed for TestClient
+factory-boy==3.3.3
+freezegun==1.5.1

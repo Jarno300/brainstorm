@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ThemeProvider,
   CssBaseline,
@@ -11,11 +11,8 @@ import {
   Button,
   alpha,
   useMediaQuery,
-  IconButton,
-  Tooltip,
   CircularProgress,
 } from '@mui/material';
-import { DarkMode, LightMode } from '@mui/icons-material';
 import { createAppTheme } from './theme';
 import { useAuth } from './auth/AuthContext';
 import LoginDialog from './auth/LoginDialog';
@@ -23,422 +20,264 @@ import RegisterDialog from './auth/RegisterDialog';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import TopicDetailPanel from './components/TopicDetailPanel';
-import {
-  listBrainstorms,
-  createBrainstorm,
-  getBrainstorm,
-  deleteBrainstorm,
-  getMessages,
-  streamMessage,
-  updateTopic,
-  deleteTopic,
-  createTopic,
-  exploreTopic,
-  getMap,
-  refreshMap,
-  getLibrary,
-  updateLibraryEntry,
-  deleteLibraryEntry,
-  updateBrainstormModel,
-  buildBrainstormWebSocketUrl,
-} from './api';
+import SearchDialog from './components/SearchDialog';
+import logger from './utils/logger';
+import { researchTopic } from './api';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useBrainstormWebSocket } from './hooks/useBrainstormWebSocket';
 
-// ─── Theme — delegated to theme system ─────────────────
-// See src/theme/createAppTheme.js
+// ─── Zustand stores ──────────────────────────────────────
+import useUIStore from './stores/uiStore';
+import useBrainstormStore from './stores/brainstormStore';
+import useChatStore from './stores/chatStore';
+import useMapStore from './stores/mapStore';
+import useLibraryStore from './stores/libraryStore';
+
+// ─── AppContent — main application shell ─────────────────
 
 function AppContent() {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
-  const [mode, setMode] = useState('light');
-  const [themeId, setThemeId] = useState(() => {
-    return localStorage.getItem('brainstorm-theme-id') || 'auburn';
-  });
-  const handleThemeChange = useCallback((newThemeId) => {
-    setThemeId(newThemeId);
-    localStorage.setItem('brainstorm-theme-id', newThemeId);
-  }, []);
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('brainstorm-sidebar-collapsed') === 'true';
-  });
-  const [reloadKey, setReloadKey] = useState(0);
+  // ── UI store ────────────────────────────────────────────
+  const mode = useUIStore((s) => s.mode);
+  const themeId = useUIStore((s) => s.themeId);
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const activeTab = useUIStore((s) => s.activeTab);
+  const setMode = useUIStore((s) => s.setMode);
+  const setThemeId = useUIStore((s) => s.setThemeId);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
+  // ── Brainstorm store ─────────────────────────────────────
+  const brainstorms = useBrainstormStore((s) => s.brainstorms);
+  const activeBrainstorm = useBrainstormStore((s) => s.activeBrainstorm);
+  const deleteTarget = useBrainstormStore((s) => s.deleteTarget);
+  const deleting = useBrainstormStore((s) => s.deleting);
+  const reloadKey = useBrainstormStore((s) => s.reloadKey);
+  const loadList = useBrainstormStore((s) => s.loadList);
+  const selectBrainstorm = useBrainstormStore((s) => s.selectBrainstorm);
+  const createBrainstorm = useBrainstormStore((s) => s.create);
+  const requestDelete = useBrainstormStore((s) => s.requestDelete);
+  const cancelDelete = useBrainstormStore((s) => s.cancelDelete);
+  const confirmDelete = useBrainstormStore((s) => s.confirmDelete);
+  const updateModel = useBrainstormStore((s) => s.updateModel);
+
+  // ── Chat store ───────────────────────────────────────────
+  const loadMessages = useChatStore((s) => s.loadMessages);
+  const abortStream = useChatStore((s) => s.abortStream);
+
+  // ── Map store ────────────────────────────────────────────
+  const mapData = useMapStore((s) => s.mapData);
+  const selectedTopic = useMapStore((s) => s.selectedTopic);
+  const exploringTopic = useMapStore((s) => s.exploringTopic);
+  const hasClassified = useMapStore((s) => s.hasClassified);
+  const loadMap = useMapStore((s) => s.loadMap);
+  const selectTopic = useMapStore((s) => s.selectTopic);
+  const closeTopicPanel = useMapStore((s) => s.closeTopicPanel);
+  const updateTopic = useMapStore((s) => s.updateTopic);
+  const deleteTopic = useMapStore((s) => s.deleteTopic);
+  const exploreTopic = useMapStore((s) => s.exploreTopic);
+  const createEdge = useMapStore((s) => s.createEdge);
+  const deleteEdge = useMapStore((s) => s.deleteEdge);
+  const handleTopicMove = useMapStore((s) => s.handleTopicMove);
+  const setExploringTopic = useMapStore((s) => s.setExploringTopic);
+  const setHasClassified = useMapStore((s) => s.setHasClassified);
+  const refreshMapData = useMapStore((s) => s.refreshMap);
+
+  // ── Library store ────────────────────────────────────────
+  const libraryData = useLibraryStore((s) => s.libraryData);
+  const loadLibrary = useLibraryStore((s) => s.loadLibrary);
+  const updateLibraryEntry = useLibraryStore((s) => s.updateEntry);
+  const deleteLibraryEntry = useLibraryStore((s) => s.deleteEntry);
+
+  // ── Theme ────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('brainstorm-theme');
     if (stored) setMode(stored);
     else if (prefersDark) setMode('dark');
-  }, [prefersDark]);
+  }, [prefersDark, setMode]);
 
   const theme = useMemo(() => createAppTheme(mode, themeId), [mode, themeId]);
 
-  const toggleTheme = useCallback(() => {
-    setMode(prev => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('brainstorm-theme', next);
-      return next;
-    });
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('brainstorm-sidebar-collapsed', next);
-      return next;
-    });
-  }, []);
-
-  const [brainstorms, setBrainstorms] = useState([]);
-  const [activeBrainstorm, setActiveBrainstorm] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [mapData, setMapData] = useState({ topics: [], edges: [], suggestions: [] });
-  const [libraryData, setLibraryData] = useState([]);
-  const [activeTab, setActiveTab] = useState('map');
-  const [sending, setSending] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [chatError, setChatError] = useState('');
-  const [exploringTopic, setExploringTopic] = useState(null);
-  const [hasClassified, setHasClassified] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const wsRef = useRef(null);
-  const streamAbortRef = useRef(null);
-  const sendingRef = useRef(false);
-  const activeBrainstormRef = useRef(null);
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    activeBrainstormRef.current = activeBrainstorm;
-  }, [activeBrainstorm]);
-
-  const loadBrainstorms = useCallback(async () => {
-    try { const res = await listBrainstorms(); setBrainstorms(res.data); return res.data; }
-    catch (err) { console.error('Failed to load brainstorms:', err); return []; }
-  }, [reloadKey]);
-
-  const loadBrainstormDetails = useCallback(async (id) => {
-    try { const res = await getBrainstorm(id); return res.data; }
-    catch (err) { console.error('Failed to load brainstorm:', err); return null; }
-  }, []);
-
-  const loadMap = useCallback(async (id) => {
-    try { const res = await getMap(id); console.log('[DEBUG] loadMap returned:', JSON.stringify(res.data).slice(0, 300)); setMapData(res.data); }
-    catch (err) { console.error('[DEBUG] Failed to load map:', err); }
-  }, []);
-
-  const loadLibrary = useCallback(async (id) => {
-    try { const res = await getLibrary(id); console.log('[DEBUG] loadLibrary returned:', JSON.stringify(res.data).slice(0, 200)); setLibraryData(res.data); }
-    catch (err) { console.error('[DEBUG] Failed to load library:', err); }
-  }, []);
-
+  // ── Initial brainstorm list load ─────────────────────────
   useEffect(() => {
     let cancelled = false;
-    (async () => { try { if (!cancelled) { const res = await listBrainstorms(); setBrainstorms(res.data); } } catch (err) { console.error(err); } })();
+    (async () => {
+      if (!cancelled) await loadList();
+    })();
     return () => { cancelled = true; };
-  }, [reloadKey]);
+  }, [reloadKey, loadList]);
 
-  // ─── Load brainstorm data on selection ────────────────────────
+  // ── Load brainstorm data on selection ────────────────────
   useEffect(() => {
-    if (activeBrainstorm) {
-      let cancelled = false;
-      (async () => {
-        try {
-          const [messagesRes, mapRes, libraryRes] = await Promise.all([
-            getMessages(activeBrainstorm.id), getMap(activeBrainstorm.id), getLibrary(activeBrainstorm.id),
-          ]);
-          if (cancelled) return;
-          console.log('[DEBUG] Loaded brainstorm data — map topics:', mapRes.data?.topics?.length, 'library folders:', libraryRes.data?.length);
-          setMessages(messagesRes.data); setMapData(mapRes.data); setLibraryData(libraryRes.data);
-        } catch (err) { console.error('[DEBUG] Load brainstorm data error:', err); }
-      })();
-      return () => { cancelled = true; };
-    }
-  }, [activeBrainstorm]);
-
-  // ─── WebSocket: live updates after async classification ───────
-  useEffect(() => {
-    const ws = wsRef.current;
-    if (!activeBrainstorm) {
-      if (ws) { ws.close(); wsRef.current = null; }
-      return;
-    }
-    // Close any previous connection before opening a new one
-    if (ws) ws.close();
-
-    const socket = new WebSocket(buildBrainstormWebSocketUrl(activeBrainstorm.id));
-    wsRef.current = socket;
-
-    socket.onmessage = (event) => {
-      console.log('[DEBUG] WebSocket message received:', event.data.slice(0, 500));
+    if (!activeBrainstorm) return;
+    let cancelled = false;
+    (async () => {
+      // Load messages first (always available). Map and library may still
+      // be generating — they'll arrive via WebSocket when classification completes.
       try {
-        const msg = JSON.parse(event.data);
-        if (msg.event === 'classification_complete' || msg.event === 'classification_error') {
-          console.log('[DEBUG] Classification event:', msg.event, '- reloading map + library');
-          if (msg.event === 'classification_error') {
-            console.error('[DEBUG] Classification error data:', msg.data);
-          }
-          // Reload map + library after Celery finishes
-          loadMap(activeBrainstorm.id);
-          loadLibrary(activeBrainstorm.id);
-          loadBrainstorms();
-          // Clear the exploring indicator now that classification completed (or errored)
-          setExploringTopic(null);
-          setHasClassified(true);
-
-        }
+        await loadMessages(activeBrainstorm.id);
       } catch (err) {
-        console.log('[DEBUG] WebSocket message parse error:', err.message);
+        logger.error('Load messages error:', err);
       }
-    };
+      if (cancelled) return;
+      // Fire map/library loads independently — don't block on them
+      loadMap(activeBrainstorm.id).catch(err => logger.debug('Map load deferred:', err?.message));
+      loadLibrary(activeBrainstorm.id).catch(err => logger.debug('Library load deferred:', err?.message));
+    })();
+    return () => { cancelled = true; };
+  }, [activeBrainstorm, loadMessages, loadMap, loadLibrary]);
 
-    socket.onclose = (e) => {
-      console.log('[DEBUG] WebSocket closed. code:', e.code, 'reason:', e.reason);
-      if (wsRef.current === socket) wsRef.current = null;
-    };
+  // ── WebSocket: live updates after async classification ───
+  useBrainstormWebSocket(activeBrainstorm, {
+    loadMap,
+    loadLibrary,
+    loadList,
+    setExploringTopic,
+    setHasClassified,
+  });
 
-    socket.onerror = (err) => {
-      console.log('[DEBUG] WebSocket error:', err);
-    };
-
-    socket.onopen = () => {
-      console.log('[DEBUG] WebSocket connected for brainstorm:', activeBrainstorm.id);
-    };
-
-    return () => {
-      socket.close();
-      if (wsRef.current === socket) wsRef.current = null;
-    };
-  }, [activeBrainstorm, loadMap, loadLibrary, loadBrainstorms]);
-
-  const handleNewBrainstorm = useCallback(() => {
-    if (streamAbortRef.current) {
-      streamAbortRef.current.abort();
-      streamAbortRef.current = null;
-    }
-    setSending(false);
-    setSelectedTopic(null);
-    setActiveBrainstorm(null);
-    setMessages([]);
-    setMapData({ topics: [], edges: [], suggestions: [] });
-    setLibraryData([]);
-    setChatError('');
-    setExploringTopic(null);
-    setHasClassified(false);
-    setActiveTab('map');
-  }, []);
-
-  const handleSelectBrainstorm = useCallback(async (brainstorm) => {
-    // Abort any in-flight stream before switching
-    if (streamAbortRef.current) {
-      streamAbortRef.current.abort();
-      streamAbortRef.current = null;
-    }
-    setSending(false);
-    const full = await loadBrainstormDetails(brainstorm.id);
-    if (!full) return;
-    setActiveBrainstorm(full); setActiveTab('map');
-    setMessages([]); setMapData({ topics: [], edges: [], suggestions: [] }); setLibraryData([]); setChatError('');
-  }, [loadBrainstormDetails]);
-
-  const clearBrainstormState = useCallback(() => {
-    setActiveBrainstorm(null);
-    setMessages([]);
-    setMapData({ topics: [], edges: [], suggestions: [] });
-    setLibraryData([]);
-    setChatError('');
-    setActiveTab('map');
-  }, []);
-
-  const handleRequestDelete = (b) => setDeleteTarget(b);
-  const handleCancelDelete = () => { if (!deleting) setDeleteTarget(null); };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const id = deleteTarget.id; await deleteBrainstorm(id);
-      const next = await loadBrainstorms(); const wasActive = activeBrainstorm?.id === id;
-      setDeleteTarget(null);
-      if (wasActive) {
-        if (next.length > 0) await handleSelectBrainstorm(next[0]);
-        else clearBrainstormState();
-      }
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        const next = await loadBrainstorms();
-        const wasActive = activeBrainstorm?.id === deleteTarget.id;
-        setDeleteTarget(null);
-        if (wasActive) {
-          if (next.length > 0) await handleSelectBrainstorm(next[0]);
-          else clearBrainstormState();
-        }
-      } else {
-        console.error(err);
-      }
-    }
-    finally { setDeleting(false); }
-  };
-
-  const submitBrainstormMessage = useCallback(async (content) => {
-    const brainstorm = activeBrainstormRef.current;
-    console.log('[DEBUG] submitBrainstormMessage called, content:', content.slice(0, 60), 'brainstorm:', !!brainstorm, 'sending:', sendingRef.current);
-    if (!brainstorm || sendingRef.current) return;
-    sendingRef.current = true;
-    setSending(true);
-    setChatError('');
-
-    const userMsgId = Date.now().toString();
-    const thinkingMessageId = `thinking-${userMsgId}`;
-    const userMsg = { id: userMsgId, brainstorm_id: brainstorm.id, role: 'user', content, created_at: new Date().toISOString() };
-
-    // Show user message + thinking placeholder immediately
-    setMessages(p => [...p, userMsg]);
-    setMessages(p => [...p, { id: thinkingMessageId, brainstorm_id: brainstorm.id, role: 'assistant', content: '', isThinking: true, isStreaming: true, created_at: new Date().toISOString() }]);
-
-    let streamedContent = '';
-    let firstToken = true;
-
-    const controller = streamMessage(
-      { brainstorm_id: brainstorm.id, message: content },
-      {
-        onToken: (token) => {
-          streamedContent += token;
-          setMessages(p => p.map(msg => {
-            if (msg.id === thinkingMessageId) {
-              return { ...msg, content: streamedContent, isThinking: firstToken };
-            }
-            return msg;
-          }));
-          firstToken = false;
-        },
-        onDone: () => {
-          setMessages(p => p.map(msg => {
-            if (msg.id === thinkingMessageId) {
-              return { ...msg, isThinking: false, isStreaming: false };
-            }
-            return msg;
-          }));
-          setSending(false);
-          sendingRef.current = false;
-          streamAbortRef.current = null;
-          loadBrainstorms();
-        },
-        onError: (error) => {
-          setMessages(p => p.filter(msg => msg.id !== thinkingMessageId));
-          setChatError(error);
-          setSending(false);
-          sendingRef.current = false;
-          streamAbortRef.current = null;
-        },
-      }
-    );
-
-    streamAbortRef.current = controller;
-  }, [loadBrainstorms]);
-
-  const handleSendMessage = useCallback((content) => {
-    void submitBrainstormMessage(content);
-  }, [submitBrainstormMessage]);
-
-  const handleSuggestionClick = useCallback((topicName) => {
-    console.log('[DEBUG] handleSuggestionClick called with:', topicName);
-    // Show immediate feedback on the map that we're exploring this topic
-    setExploringTopic(topicName);
-    // Phrase it like a prompt so the backend promotes the existing proposition
-    // instead of creating a brand-new topic from a generic classification pass.
-    void submitBrainstormMessage(`Tell me about ${topicName}`);
-  }, [submitBrainstormMessage]);
+  // ⌘K / Ctrl+K for search, Ctrl+Z / Ctrl+Shift+Z for undo/redo
+  useKeyboardShortcuts(setSearchOpen);
 
   // Abort any in-flight stream on unmount
   useEffect(() => {
-    return () => {
-      if (streamAbortRef.current) {
-        streamAbortRef.current.abort();
-        streamAbortRef.current = null;
-      }
-    };
-  }, []);
+    return () => abortStream();
+  }, [abortStream]);
 
-  const handleModelChange = useCallback(async (model) => {
+  // ── Handlers (thin wrappers around store actions) ────────
+  const handleNewBrainstorm = useCallback(() => {
+    abortStream();
+    useBrainstormStore.getState().clear();
+    useChatStore.getState().clear();
+    useMapStore.getState().clear();
+    useLibraryStore.getState().clear();
+    useUIStore.getState().setActiveTab('map');
+  }, [abortStream]);
+
+  const handleSelectBrainstorm = useCallback(async (brainstorm) => {
+    abortStream();
+    await selectBrainstorm(brainstorm);
+    useUIStore.getState().setActiveTab('map');
+    useChatStore.getState().clear();
+    useMapStore.getState().clear();
+    useLibraryStore.getState().clear();
+  }, [abortStream, selectBrainstorm]);
+
+  const toggleTheme = useCallback(() => {
+    setMode(mode === 'dark' ? 'light' : 'dark');
+  }, [mode, setMode]);
+
+  const handleThemeChange = useCallback((newThemeId) => {
+    setThemeId(newThemeId);
+  }, [setThemeId]);
+
+  const handleSuggestionClick = useCallback((topicName, sourceTopicId) => {
     if (!activeBrainstorm) return;
-    try {
-      await updateBrainstormModel(activeBrainstorm.id, model);
-      // Reload brainstorm to update the model chip
-      const updated = await loadBrainstormDetails(activeBrainstorm.id);
-      if (updated) setActiveBrainstorm(updated);
-    } catch (err) {
-      console.error('Failed to update model:', err);
-    }
-  }, [activeBrainstorm, loadBrainstormDetails]);
-
-  const handleRefreshMap = async () => {
-    if (!activeBrainstorm) return;
-    try { const res = await refreshMap(activeBrainstorm.id); setMapData(res.data); }
-    catch (err) { console.error(err); }
-  };
-
-  const handleTopicClick = useCallback((topic) => {
-    setSelectedTopic(topic);
-  }, []);
-
-  const handleCloseTopicPanel = useCallback(() => {
-    setSelectedTopic(null);
-  }, []);
-
-  const handleUpdateTopic = useCallback(async (topicId, data) => {
-    if (!activeBrainstorm) return;
-    await updateTopic(activeBrainstorm.id, topicId, data);
-    const mapRes = await getMap(activeBrainstorm.id);
-    setMapData(mapRes.data);
-    const fresh = mapRes.data?.topics?.find(t => t.id === topicId);
-    if (fresh) setSelectedTopic(fresh);
-  }, [activeBrainstorm]);
-
-  const handleDeleteTopic = useCallback(async (topicId) => {
-    if (!activeBrainstorm) return;
-    await deleteTopic(activeBrainstorm.id, topicId);
-    setSelectedTopic(null);
-    await loadMap(activeBrainstorm.id);
-    await loadLibrary(activeBrainstorm.id);
-  }, [activeBrainstorm, loadMap, loadLibrary]);
-
-  const handleExploreTopic = useCallback(async (topicId) => {
-    if (!activeBrainstorm) return;
-    const res = await exploreTopic(activeBrainstorm.id, topicId);
-    setMapData(res.data);
-    await loadLibrary(activeBrainstorm.id);
-  }, [activeBrainstorm, loadLibrary]);
+    setExploringTopic({ name: topicName, sourceTopicId });
+    setHasClassified(false);
+    researchTopic(activeBrainstorm.id, topicName).catch(err =>
+      logger.error('Research failed:', err)
+    );
+  }, [activeBrainstorm, setExploringTopic, setHasClassified]);
 
   const handleSwitchToLibrary = useCallback(() => {
-    setActiveTab('library');
+    useUIStore.getState().setActiveTab('library');
   }, []);
 
   const handleStartNewBrainstorm = useCallback(async (topic) => {
-    console.log('[DEBUG] handleStartNewBrainstorm called with topic:', topic);
     try {
-      const res = await createBrainstorm({ title: topic });
-      console.log('[DEBUG] createBrainstorm response:', JSON.stringify(res.data));
-      setActiveBrainstorm(res.data);
-      setMessages([]);
-      setMapData({ topics: [], edges: [], suggestions: [] });
-      setLibraryData([]);
-      setChatError('');
-      setActiveTab('map');
-      await loadBrainstorms();
-      // Use streaming — the topic message gets the same real-time treatment
-      submitBrainstormMessage(topic);
+      const b = await createBrainstorm(topic);
+      if (b) {
+        useChatStore.getState().clear();
+        useMapStore.getState().clear();
+        useLibraryStore.getState().clear();
+        useUIStore.getState().setActiveTab('map');
+        // Research the topic — builds the knowledge map in one LLM call
+        setHasClassified(false);
+        researchTopic(b.id, topic).catch(err =>
+          logger.error('Research failed:', err)
+        );
+      }
     } catch (err) {
-      console.error('Failed to start brainstorm:', err);
+      logger.error('Failed to start brainstorm:', err);
     }
-  }, [loadBrainstorms, submitBrainstormMessage]);
+  }, [createBrainstorm, setHasClassified]);
 
-  const handleUpdateLibraryEntry = async (entryId, content) => {
-    try { await updateLibraryEntry(entryId, content); await loadLibrary(activeBrainstorm.id); }
-    catch (err) { console.error(err); }
-  };
+  const handleModelChange = useCallback(async (model) => {
+    if (!activeBrainstorm) return;
+    await updateModel(activeBrainstorm.id, model);
+  }, [activeBrainstorm, updateModel]);
 
-  const handleDeleteLibraryEntry = async (entryId) => {
-    try { await deleteLibraryEntry(entryId); await loadLibrary(activeBrainstorm.id); }
-    catch (err) { console.error(err); }
-  };
+  const handleRefreshMap = useCallback(async () => {
+    if (!activeBrainstorm) return;
+    await refreshMapData(activeBrainstorm.id);
+  }, [activeBrainstorm, refreshMapData]);
+
+  const handleUpdateLibraryEntryWrap = useCallback(async (entryId, content) => {
+    await updateLibraryEntry(entryId, content);
+    if (activeBrainstorm) await loadLibrary(activeBrainstorm.id);
+  }, [activeBrainstorm, updateLibraryEntry, loadLibrary]);
+
+  const handleDeleteLibraryEntryWrap = useCallback(async (entryId) => {
+    await deleteLibraryEntry(entryId);
+    if (activeBrainstorm) await loadLibrary(activeBrainstorm.id);
+  }, [activeBrainstorm, deleteLibraryEntry, loadLibrary]);
+
+  const handleDeleteTopicWrap = useCallback(async (topicId) => {
+    if (!activeBrainstorm) return;
+    await deleteTopic(activeBrainstorm.id, topicId);
+    if (activeBrainstorm) await loadLibrary(activeBrainstorm.id);
+  }, [activeBrainstorm, deleteTopic, loadLibrary]);
+
+  const handleUpdateTopicWrap = useCallback(async (topicId, data) => {
+    if (!activeBrainstorm) return;
+    await updateTopic(activeBrainstorm.id, topicId, data);
+  }, [activeBrainstorm, updateTopic]);
+
+  const handleExploreTopicWrap = useCallback(async (topicId) => {
+    if (!activeBrainstorm) return;
+    await exploreTopic(activeBrainstorm.id, topicId);
+    if (activeBrainstorm) await loadLibrary(activeBrainstorm.id);
+  }, [activeBrainstorm, exploreTopic, loadLibrary]);
+
+  const handleTopicMoveWrap = useCallback((topicId, x, y) => {
+    if (!activeBrainstorm) return;
+    handleTopicMove(activeBrainstorm.id, topicId, x, y);
+  }, [activeBrainstorm, handleTopicMove]);
+
+  const handleEdgeCreate = useCallback(async (sourceId, targetId) => {
+    if (!activeBrainstorm) return;
+    await createEdge(activeBrainstorm.id, sourceId, targetId);
+  }, [activeBrainstorm, createEdge]);
+
+  const handleEdgeDelete = useCallback(async (edge) => {
+    if (!activeBrainstorm) return;
+    await deleteEdge(activeBrainstorm.id, edge);
+  }, [activeBrainstorm, deleteEdge]);
+
+  const handleAddBlankTopic = useCallback(async (brainstormId, name) => {
+    await useMapStore.getState().addBlankTopic(brainstormId, name);
+  }, []);
+
+  const handleGenerateContent = useCallback(async (brainstormId, topicId, callbacks) => {
+    return await useMapStore.getState().generateContent(brainstormId, topicId, callbacks);
+  }, []);
+
+  const handleUpdateOutline = useCallback((brainstormId, topicId, outline) => {
+    useMapStore.getState().updateOutline(brainstormId, topicId, outline);
+  }, []);
+
+  const handleExploreConnection = useCallback(async (brainstormId, sourceId, targetId, x, y) => {
+    try {
+      await useMapStore.getState().exploreConnection(brainstormId, sourceId, targetId, x, y);
+    } catch (err) {
+      // 409: connection already exists — silently ignore
+      if (err?.response?.status !== 409) {
+        logger.error('Failed to explore connection:', err);
+      }
+    }
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>
@@ -464,31 +303,43 @@ function AppContent() {
           activeBrainstorm={activeBrainstorm}
           onNew={handleNewBrainstorm}
           onSelect={handleSelectBrainstorm}
-          onDelete={handleRequestDelete}
+          onDelete={requestDelete}
           mode={mode}
           onToggleTheme={toggleTheme}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
-          onRenameComplete={() => setReloadKey(k => k + 1)}
+          onRenameComplete={() => useBrainstormStore.getState().loadList()}
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative', zIndex: 1 }}>
           <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <ChatWindow
                 activeBrainstorm={activeBrainstorm}
-                mapData={mapData} libraryData={libraryData}
-                activeTab={activeTab} onTabChange={setActiveTab}
+                mapData={mapData}
+                libraryData={libraryData}
+                activeTab={activeTab}
+                onTabChange={useUIStore.getState().setActiveTab}
                 onRefreshMap={handleRefreshMap}
-                onUpdateLibraryEntry={handleUpdateLibraryEntry}
-                onDeleteLibraryEntry={handleDeleteLibraryEntry}
+                onUpdateLibraryEntry={handleUpdateLibraryEntryWrap}
+                onDeleteLibraryEntry={handleDeleteLibraryEntryWrap}
+                onDeleteTopic={handleDeleteTopicWrap}
+                onUpdateTopic={handleUpdateTopicWrap}
                 onStartNewBrainstorm={handleStartNewBrainstorm}
                 onSuggestionClick={handleSuggestionClick}
-                onTopicClick={handleTopicClick}
+                onTopicClick={selectTopic}
+                onTopicMove={handleTopicMoveWrap}
+                onEdgeCreate={handleEdgeCreate}
+                onEdgeDelete={handleEdgeDelete}
                 selectedTopic={selectedTopic}
-                exploringTopic={exploringTopic}
+                exploringSuggestion={exploringTopic}
                 hasClassified={hasClassified}
-                themeId={themeId} onThemeChange={handleThemeChange}
+                themeId={themeId}
+                onThemeChange={handleThemeChange}
                 onModelChange={handleModelChange}
+                onAddBlankTopic={handleAddBlankTopic}
+                onGenerateContent={handleGenerateContent}
+                onUpdateOutline={handleUpdateOutline}
+                onExploreConnection={handleExploreConnection}
               />
             </Box>
             {selectedTopic && (
@@ -496,10 +347,10 @@ function AppContent() {
                 topic={selectedTopic}
                 mapData={mapData}
                 libraryData={libraryData}
-                onClose={handleCloseTopicPanel}
-                onUpdate={handleUpdateTopic}
-                onDelete={handleDeleteTopic}
-                onExplore={handleExploreTopic}
+                onClose={closeTopicPanel}
+                onUpdate={handleUpdateTopicWrap}
+                onDelete={handleDeleteTopicWrap}
+                onExplore={handleExploreTopicWrap}
                 onSwitchToLibrary={handleSwitchToLibrary}
               />
             )}
@@ -507,8 +358,11 @@ function AppContent() {
         </Box>
       </Box>
 
+      {/* ── Search Dialog ────────────────────────────────── */}
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+
       {/* ── Delete Dialog ────────────────────────────────── */}
-      <Dialog open={Boolean(deleteTarget)} onClose={handleCancelDelete} maxWidth="xs">
+      <Dialog open={Boolean(deleteTarget)} onClose={cancelDelete} maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 700, fontSize: '1.1rem', pb: 0.5 }}>Delete brainstorm?</DialogTitle>
         <DialogContent sx={{ pb: 1 }}>
           <DialogContentText sx={(theme) => ({ color: alpha(theme.palette.text.primary, 0.6), fontSize: '0.875rem', lineHeight: 1.6 })}>
@@ -518,20 +372,21 @@ function AppContent() {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={handleCancelDelete} disabled={deleting}
+          <Button onClick={cancelDelete} disabled={deleting}
             sx={(theme) => ({ color: alpha(theme.palette.text.primary, 0.6), textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 2.5, py: 1, fontSize: '0.85rem', '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.5), color: theme.palette.text.primary } })}>
             Cancel
           </Button>
-          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error"
+          <Button onClick={confirmDelete} disabled={deleting} variant="contained" color="error"
             sx={{ borderRadius: 1, textTransform: 'none', fontWeight: 700, px: 2.5, py: 1, fontSize: '0.85rem', boxShadow: (theme) => `0 4px 16px ${alpha(theme.palette.error.main, 0.35)}`, '&:hover': { boxShadow: (theme) => `0 6px 24px ${alpha(theme.palette.error.main, 0.5)}` } }}>
             {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
-
     </ThemeProvider>
   );
 }
+
+// ─── AuthGate — routes unauthenticated users to login/register ──
 
 function AuthGate() {
   const { token, loading } = useAuth();

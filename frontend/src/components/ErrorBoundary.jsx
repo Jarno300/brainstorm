@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import * as Sentry from '@sentry/react';
 import { Box, Typography, Button, alpha } from '@mui/material';
 import { Error as ErrorIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 
@@ -14,6 +15,7 @@ class ErrorBoundary extends Component {
 
     componentDidCatch(error, errorInfo) {
         console.error('ErrorBoundary caught:', error, errorInfo);
+        Sentry.captureException(error, { extra: { componentStack: errorInfo?.componentStack } });
     }
 
     handleRetry = () => {

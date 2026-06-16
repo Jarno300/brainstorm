@@ -1,7 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 import uuid
+
+
+class OutlineSection(BaseModel):
+    """A user-defined section title for a topic outline."""
+    title: str = Field(..., min_length=1, max_length=255)
 
 
 class TopicResponse(BaseModel):
@@ -13,6 +18,9 @@ class TopicResponse(BaseModel):
     created_at: datetime
     confidence: float
     is_proposition: bool
+    position_x: float = 0.0
+    position_y: float = 0.0
+    outline: Optional[List[OutlineSection]] = None
 
     class Config:
         from_attributes = True
@@ -47,16 +55,23 @@ class TopicRenameRequest(BaseModel):
 class TopicUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    position_x: Optional[float] = None
+    position_y: Optional[float] = None
+    outline: Optional[List[OutlineSection]] = None
 
 
 class TopicCreateRequest(BaseModel):
     name: str
     description: str = ""
+    outline: Optional[List[OutlineSection]] = None
+    auto_generate: bool = True
 
 
-class MapConnectionCreateRequest(BaseModel):
+class EdgeCreateRequest(BaseModel):
     source_topic_id: uuid.UUID
     target_topic_id: uuid.UUID
+    relationship: str = "related"
+    weight: float = 0.5
 
 
 class MapDataResponse(BaseModel):

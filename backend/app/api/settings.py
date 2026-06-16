@@ -8,7 +8,7 @@ from app.models.provider_setting import ProviderSetting
 from app.api.auth import get_current_user
 from app.models.user import User
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 class ProviderSettingsResponse(BaseModel):
@@ -28,9 +28,11 @@ class ProviderSettingsUpdate(BaseModel):
 
 def _mask_key(key: str) -> str:
     """Show only last 4 characters of an API key."""
-    if len(key) <= 8:
-        return "****" if key else ""
-    return key[:4] + "****" + key[-4:]
+    if not key:
+        return ""
+    if len(key) <= 4:
+        return "****"
+    return "****" + key[-4:]
 
 
 @router.get("/{provider}", response_model=ProviderSettingsResponse)

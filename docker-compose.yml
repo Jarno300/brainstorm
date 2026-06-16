@@ -38,9 +38,15 @@ services:
       - brainstorm-net
 
   # =====================
-  # Ollama Model Server
+  # Ollama Model Server (opt-in via --profile ollama)
+  #
+  # Only needed when DEFAULT_MODEL uses an ollama/... model.
+  # For DeepSeek/OpenAI/Anthropic, skip this service entirely.
+  #
+  # Start with:  docker compose --profile ollama up
   # =====================
   ollama:
+    profiles: ["ollama"]
     image: ollama/ollama:latest
     environment:
       DEFAULT_MODEL: ${DEFAULT_MODEL:-ollama/llama3.2:1b}
@@ -100,16 +106,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://raguser:ragpassword@postgres:5432/ragdb
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      DEFAULT_MODEL: ${DEFAULT_MODEL:-ollama/llama3.2:1b}
       APP_ENV: ${APP_ENV:-development}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-DEBUG}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://frontend:5173}
@@ -124,8 +128,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
     networks:
       - brainstorm-net
 
@@ -136,25 +138,25 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: sh -c "alembic upgrade head && celery -A app.tasks.celery_app worker --loglevel=info --pool=solo"
+    command: sh -c "celery -A app.tasks.celery_app worker --loglevel=info --pool=$${CELERY_POOL:-prefork} --concurrency=$${CELERY_CONCURRENCY:-4}"
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://raguser:ragpassword@postgres:5432/ragdb
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CELERY_POOL: ${CELERY_POOL:-prefork}
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-4}
+      CELERY_TASK_SOFT_TIME_LIMIT: ${CELERY_TASK_SOFT_TIME_LIMIT:-180}
+      CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT:-300}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      DEFAULT_MODEL: ${DEFAULT_MODEL:-ollama/llama3.2:1b}
       APP_ENV: ${APP_ENV:-development}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-DEBUG}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      ollama:
         condition: service_healthy
     networks:
       - brainstorm-net

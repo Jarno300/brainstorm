@@ -1,31 +1,50 @@
 """
 Service for topic extraction from conversations.
 
-Architecture: we avoid complex structured output (JSON arrays with
-confidence scores) that weak local models can't produce reliably.
-Instead, we ask for a simple comma-separated list and parse it.
-
-Library entries reuse the AI's chat response directly — no
-re-summarization needed. Map suggestions use regex extraction
-from content (see map_suggestion_service).
+Uses LLM for extraction with improved prompting, deduplication,
+and confidence scoring.
 """
+
 import logging
 import re
 import time
-from typing import List
+from difflib import SequenceMatcher
+from typing import List, Set
 
 from app.services.ai_service import chat_with_model_sync
 
 logger = logging.getLogger(__name__)
 
-# Max chars of conversation to include in the prompt
 MAX_PROMPT_CHARS = 4000
+SIMILARITY_THRESHOLD = 0.75   # Merge topics above this similarity score
 
+TOPIC_EXTRACTION_PROMPT = """Extract 3-8 distinct key topics from this conversation.
+Return them as a JSON array with "name", "description", and "confidence" (0-1):
 
-TOPIC_EXTRACTION_PROMPT = """Extract 2-5 key topics from this conversation.
-Return ONLY lowercase comma-separated keywords. No descriptions, no markdown.
+[
+  {{"name": "quantum-computing", "description": "Uses quantum mechanics for computation, key concepts include superposition and entanglement", "confidence": 0.9}},
+  {{"name": "qubits", "description": "Basic unit of quantum information, can represent 0 and 1 simultaneously unlike classical bits", "confidence": 0.8}}
+]
 
-Example output: quantum-computing, qubits, superposition, entanglement
+Rules:
+- Names must be short hyphenated slugs (3-5 words max)
+- Descriptions must be 1-2 complete sentences, informative and standalone
+- Confidence: 0.9+ for core topics discussed extensively, 0.5-0.8 for supporting topics
+- Only return the JSON array, nothing else
+- Do not include topics that are trivial, offhand mentions, or greetings
+
+Conversation:
+{conversation}
+
+Topics (JSON array only):"""
+
+# Simpler fallback prompt for models that struggle with structured output
+TOPIC_EXTRACTION_FALLBACK = """List 3-5 important topics from this conversation.
+One topic per line. Use this format: "topic-name - one sentence description"
+
+Example:
+quantum-computing - uses quantum mechanics for computation
+qubits - basic unit of quantum information
 
 Conversation:
 {conversation}
@@ -36,49 +55,149 @@ Topics:"""
 def _clean_topic_name(raw: str) -> str:
     """Convert a raw topic string into a clean lowercase-hyphenated slug."""
     s = str(raw).strip()
-    # Strip markdown and punctuation
     s = re.sub(r'\*\*?|__?|`', '', s)
     s = re.sub(r'[\[\]{}()"\'#]', '', s)
-    # Take first item if comma-separated
     if ',' in s:
         s = s.split(',')[0].strip()
-    # Normalize
     s = ' '.join(s.split()).lower()
     s = re.sub(r'[^a-z0-9\s-]', '', s)
     s = re.sub(r'\s+', '-', s).strip('-')
     return s if s and len(s) > 1 else ''
 
 
-def extract_topics(conversation_text: str) -> List[str]:
-    """Extract topic keywords from a conversation.
+def _parse_json_response(raw: str) -> List[dict]:
+    """Parse LLM output as JSON, with fallback to line-by-line parsing."""
+    import json
 
-    Asks the LLM for a comma-separated list — no JSON, no confidence
-    scores, no descriptions. Even a 1B model can handle this reliably.
+    # Try to extract a JSON array
+    raw = raw.strip()
+    # Remove markdown code fences if present
+    raw = re.sub(r'^```(?:json)?\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
 
-    Returns a list of clean lowercase-hyphenated topic slugs.
+    # Try JSON parse
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            topics = []
+            for item in data:
+                if isinstance(item, dict) and "name" in item:
+                    name = _clean_topic_name(item["name"])
+                    if name:
+                        topics.append({
+                            "name": name,
+                            "description": str(item.get("description", "")).strip(),
+                            "confidence": float(item.get("confidence", 0.5)),
+                        })
+            return topics
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Fallback: line-by-line parsing
+    topics: List[dict] = []
+    seen: Set[str] = set()
+    for line in raw.split('\n'):
+        line = line.strip().strip(',').strip('"').strip("'")
+        if not line:
+            continue
+        match = re.match(r'^(.+?)\s*[-–:]\s*(.+)$', line)
+        if match:
+            name = _clean_topic_name(match.group(1))
+            desc = match.group(2).strip()
+        else:
+            name = _clean_topic_name(line)
+            desc = ""
+        if name and name not in seen:
+            seen.add(name)
+            topics.append({"name": name, "description": desc, "confidence": 0.5})
+            if len(topics) >= 8:
+                break
+
+    return topics
+
+
+def _similarity(a: str, b: str) -> float:
+    """Compute string similarity between two topic names."""
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def _deduplicate_topics(topics: List[dict]) -> List[dict]:
+    """Merge near-duplicate topics, keeping the one with higher confidence."""
+    if len(topics) <= 1:
+        return topics
+
+    merged = []
+    used = set()
+
+    for i, t1 in enumerate(topics):
+        if i in used:
+            continue
+        best = t1
+        for j, t2 in enumerate(topics):
+            if j <= i or j in used:
+                continue
+            sim = _similarity(t1["name"], t2["name"])
+            if sim >= SIMILARITY_THRESHOLD:
+                # Merge: keep higher confidence, combine descriptions
+                used.add(j)
+                if t2["confidence"] > best["confidence"]:
+                    best = t2
+                # Combine descriptions if they differ meaningfully
+                if t1["description"] and t2["description"]:
+                    best = {
+                        **best,
+                        "description": t1["description"]
+                        if len(t1["description"]) > len(t2["description"])
+                        else t2["description"],
+                    }
+        merged.append(best)
+
+    return merged
+
+
+def extract_topics(conversation_text: str, use_fallback: bool = False) -> List[dict]:
+    """Extract distinct topics with descriptions and confidence from a conversation.
+
+    Tries the structured JSON prompt first. If it returns empty results and
+    use_fallback is True, retries with a simpler line-by-line prompt that
+    weaker models can handle.
+
+    Returns a list of {"name": str, "description": str, "confidence": float} dicts.
     """
     t0 = time.perf_counter()
     conv = conversation_text[:MAX_PROMPT_CHARS]
+
+    # Try the JSON prompt first
     prompt = TOPIC_EXTRACTION_PROMPT.format(conversation=conv)
-    logger.debug("extract_topics start | prompt_chars=%d", len(prompt))
+    logger.debug("extract_topics start | prompt_chars=%d fallback=%s", len(prompt), use_fallback)
 
     try:
         response = chat_with_model_sync([{"role": "user", "content": prompt}])
         elapsed = time.perf_counter() - t0
 
-        names: List[str] = []
-        seen = set()
-        for part in response.split(','):
-            name = _clean_topic_name(part)
-            if name and name not in seen:
-                seen.add(name)
-                names.append(name)
-                if len(names) >= 5:
-                    break
+        topics = _parse_json_response(response)
 
-        logger.debug("extract_topics done  | elapsed=%.2fs topics=%d raw=%.120s",
-                     elapsed, len(names), response)
-        return names
+        # If JSON parsing produced nothing and fallback is enabled, try simpler prompt
+        if not topics and use_fallback:
+            logger.debug("extract_topics json_empty, trying fallback | elapsed=%.2fs", elapsed)
+            fallback_prompt = TOPIC_EXTRACTION_FALLBACK.format(conversation=conv)
+            try:
+                fallback_response = chat_with_model_sync(
+                    [{"role": "user", "content": fallback_prompt}]
+                )
+                topics = _parse_json_response(fallback_response)
+            except Exception as fb_err:
+                logger.warning("extract_topics fallback also failed: %s", fb_err)
+
+        topics = _deduplicate_topics(topics)
+        topics.sort(key=lambda t: t["confidence"], reverse=True)
+        topics = topics[:8]
+
+        logger.debug(
+            "extract_topics done | elapsed=%.2fs topics=%d raw_len=%d",
+            elapsed, len(topics), len(response),
+        )
+        return topics
 
     except Exception as e:
         elapsed = time.perf_counter() - t0

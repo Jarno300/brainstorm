@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 import uuid
 
@@ -18,3 +18,10 @@ class MessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedMessagesResponse(BaseModel):
+    """Cursor-based paginated response for messages."""
+    messages: List[MessageResponse]
+    has_more: bool
+    before_id: Optional[str] = None  # Cursor to pass for the previous page

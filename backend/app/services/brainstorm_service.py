@@ -17,7 +17,7 @@ def _active_query(db: Session):
 def create_brainstorm(db: Session, data: BrainstormCreate, user_id: uuid.UUID | None = None) -> Brainstorm:
     brainstorm = Brainstorm(
         title=data.title,
-        model=data.model or "ollama/llama3.2:1b",
+        model=data.model or "deepseek/deepseek-chat",
         user_id=user_id,
     )
     db.add(brainstorm)

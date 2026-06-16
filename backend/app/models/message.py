@@ -24,9 +24,14 @@ class Message(Base):
     created_at = Column(DateTime, default=utcnow, index=True)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     metadata_json = Column(JSONType, default=dict)
+    # Branching support
+    branch_id = Column(UUID(as_uuid=True), nullable=True, index=True, default=None)
+    parent_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True, default=None)
 
     brainstorm = relationship("Brainstorm", back_populates="messages")
+    parent_message = relationship("Message", remote_side="Message.id", backref="children")
 
     __table_args__ = (
         Index("ix_messages_brainstorm_created", brainstorm_id, created_at),
+        Index("ix_messages_brainstorm_branch", brainstorm_id, branch_id),
     )

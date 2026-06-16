@@ -6,26 +6,51 @@ to a Redis sorted set keyed by client IP + route; entries outside the
 window are trimmed before checking.
 """
 
-import time
 import logging
+import time
 from typing import Callable
 
+import jwt
 import redis
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from app.config import REDIS_URL
+from app.config import REDIS_URL, SECRET_KEY, JWT_ALGORITHM
 
 logger = logging.getLogger(__name__)
+
+# ─── Tier-based multipliers ─────────────────────────────────
+TIER_MULTIPLIERS = {
+    "free": 1.0,
+    "premium": 3.0,
+    "pro": 5.0,
+}
+
+# ─── Redis connection pool (shared across all requests) ─────
+# Creating a new connection per request exhausts Redis under load.
+# This pool is lazily initialized on first use.
+_pool: redis.ConnectionPool | None = None
+
+
+def _get_redis_pool() -> redis.ConnectionPool:
+    """Return a shared Redis connection pool, creating it if needed."""
+    global _pool
+    if _pool is None:
+        _pool = redis.ConnectionPool.from_url(REDIS_URL, decode_responses=True)
+    return _pool
 
 # ─── Per-route limits ────────────────────────────────────────
 # (route_prefix, window_seconds, max_requests)
 _ROUTE_LIMITS: list[tuple[str, int, int]] = [
-    ("/api/auth/login", 60, 10),       # 10 login attempts per minute
-    ("/api/auth/register", 3600, 5),   # 5 registrations per hour
-    ("/api/chat/", 60, 30),            # 30 chat messages per minute
-    ("/api/brainstorms", 60, 60),      # 60 CRUD ops per minute
+    ("/api/v1/auth/login", 60, 10),
+    ("/api/auth/login", 60, 10),         # backward compat
+    ("/api/v1/auth/register", 3600, 5),
+    ("/api/auth/register", 3600, 5),      # backward compat
+    ("/api/v1/chat/", 60, 30),
+    ("/api/chat/", 60, 30),               # backward compat
+    ("/api/v1/brainstorms", 60, 60),
+    ("/api/brainstorms", 60, 60),          # backward compat
 ]
 
 # ─── Fallback for unmatched routes ───────────────────────────
@@ -49,6 +74,23 @@ def _rate_limit_key(request: Request) -> str:
     return f"ratelimit:{client_ip}:{path}"
 
 
+def _extract_tier(request: Request) -> str:
+    """Extract user tier from the Authorization header without DB lookup.
+
+    Decodes the JWT to read the 'tier' claim. Returns 'free' on any failure
+    so that unauthenticated/malformed tokens get the default limits.
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return "free"
+    try:
+        token = auth.split(" ", 1)[1]
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return str(payload.get("tier", "free")).lower()
+    except Exception:
+        return "free"
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Redis-backed sliding-window rate limiter.
 
@@ -58,10 +100,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app, redis_url: str = REDIS_URL):
         super().__init__(app)
-        self._redis_url = redis_url
+        # Ensure the shared pool is initialized
+        _get_redis_pool()
 
     def _get_redis(self) -> redis.Redis:
-        return redis.Redis.from_url(self._redis_url, decode_responses=True)
+        return redis.Redis(connection_pool=_get_redis_pool())
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip WebSocket upgrade requests (not rate-limited here)
@@ -69,6 +112,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         window, max_req = _get_limits(request.url.path)
+        tier = _extract_tier(request)
+        multiplier = TIER_MULTIPLIERS.get(tier, 1.0)
+        effective_max = int(max_req * multiplier)
         key = _rate_limit_key(request)
         now = time.time()
         window_start = now - window
@@ -82,7 +128,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             pipe.zcard(key)
             _, count = pipe.execute()
 
-            if count and int(count) >= max_req:
+            if count and int(count) >= effective_max:
                 retry_after = int(window - (now - window_start))
                 return JSONResponse(
                     status_code=429,

@@ -8,11 +8,14 @@ import httpx
 from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from sqlalchemy.orm import Session
 from app.config import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_API_VERSION,
     ANTHROPIC_BASE_URL,
     CLASSIFICATION_MODEL,
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
     DEFAULT_MODEL,
     OLLAMA_BASE_URL,
     OLLAMA_KEEP_ALIVE,
@@ -20,6 +23,7 @@ from app.config import (
     OLLAMA_NUM_PREDICT,
     OPENAI_API_KEY,
 )
+from app.models.provider_setting import ProviderSetting
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +193,7 @@ def resolve_model_spec(model: Optional[str] = None) -> ResolvedModel:
     else:
         provider, model_name = "ollama", normalized
 
-    if provider not in {"ollama", "openai", "anthropic"}:
+    if provider not in {"ollama", "openai", "anthropic", "deepseek"}:
         provider, model_name = "ollama", normalized
 
     return ResolvedModel(provider=provider, model_name=model_name)
@@ -222,6 +226,23 @@ def get_chat_model(
             num_predict=OLLAMA_NUM_PREDICT,
             num_ctx=OLLAMA_NUM_CTX,
             keep_alive=OLLAMA_KEEP_ALIVE,
+        )
+
+    # DeepSeek — OpenAI-compatible API, uses ChatOpenAI with custom base URL
+    if resolved.provider == "deepseek":
+        key = api_key or DEEPSEEK_API_KEY
+        if not key:
+            raise ValueError(
+                "DeepSeek API key is not configured. "
+                "Set DEEPSEEK_API_KEY in your environment or "
+                "provide one via Settings → Add Model."
+            )
+        return ChatOpenAI(
+            model=resolved.model_name,
+            api_key=key,
+            base_url=base_url or DEEPSEEK_BASE_URL,
+            temperature=0.7,
+            max_tokens=max_tokens,
         )
 
     if resolved.provider == "openai":
@@ -308,8 +329,8 @@ async def stream_chat_with_model(
 ) -> AsyncIterator[str]:
     """Stream tokens from the chat model as they are generated.
 
-    Yields content chunks for all three providers:
-    - Ollama / OpenAI: uses LangChain astream()
+    Yields content chunks for all providers:
+    - Ollama / OpenAI / DeepSeek: uses LangChain astream()
     - Anthropic: uses custom SSE streaming
     """
     t0 = time.perf_counter()
@@ -365,8 +386,33 @@ def generate_structured_json_sync(prompt: str, model: Optional[str] = None) -> s
     return chat_with_model_sync([{"role": "user", "content": prompt}], model=model)
 
 
+def resolve_credentials(
+    db: Session,
+    model: str,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Resolve API key and base URL for a model.
+
+    Resolution order: explicit args → ProviderSetting in DB → env var / default.
+    """
+    resolved = resolve_model_spec(model)
+    if not api_key or not base_url:
+        db_setting = db.query(ProviderSetting).filter(
+            ProviderSetting.provider == resolved.provider
+        ).first()
+        if db_setting:
+            if not api_key and db_setting.api_key:
+                api_key = db_setting.api_key
+            if not base_url and db_setting.base_url:
+                base_url = db_setting.base_url
+    return api_key, base_url
+
+
 def get_model_options() -> List[Tuple[str, str]]:
     return [
+        ("deepseek/deepseek-chat", "DeepSeek · DeepSeek-Chat"),
+        ("deepseek/deepseek-reasoner", "DeepSeek · DeepSeek-Reasoner"),
         ("ollama/llama3.2:1b", "Ollama · llama3.2:1b"),
         ("openai/gpt-4o-mini", "OpenAI · gpt-4o-mini"),
         ("anthropic/claude-3-5-sonnet-latest", "Anthropic · claude-3-5-sonnet-latest"),

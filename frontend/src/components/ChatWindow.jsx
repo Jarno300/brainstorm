@@ -8,9 +8,9 @@ import AddModelModal from './AddModelModal';
 import ShareDialog from './ShareDialog';
 import LibraryTab from './LibraryTab';
 
-const MapTab = lazy(() => import('./MapTab'));
+const CanvasTab = lazy(() => import('./CanvasTab'));
 
-function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabChange, onRefreshMap, onUpdateLibraryEntry, onDeleteLibraryEntry, onSuggestionClick, onTopicClick, selectedTopic, exploringTopic, hasClassified, themeId, onThemeChange, onModelChange, onStartNewBrainstorm }) {
+function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabChange, onRefreshMap, onUpdateLibraryEntry, onDeleteLibraryEntry, onSuggestionClick, onTopicClick, onTopicMove, onDeleteTopic, onUpdateTopic, onEdgeCreate, onEdgeDelete, selectedTopic, exploringSuggestion, hasClassified, themeId, onThemeChange, onModelChange, onStartNewBrainstorm, onAddBlankTopic, onGenerateContent, onUpdateOutline, onExploreConnection }) {
     const [addModelOpen, setAddModelOpen] = useState(false);
     const [shareOpen, setShareOpen] = useState(false);
     const [refreshModels, setRefreshModels] = useState(null);
@@ -267,7 +267,7 @@ function ChatWindow({ activeBrainstorm, mapData, libraryData, activeTab, onTabCh
                                         <CircularProgress size={32} sx={(t) => ({ color: t.palette.primary.light })} />
                                     </Box>
                                 }>
-                                    <MapTab mapData={mapData} onRefresh={onRefreshMap} onSuggestionClick={onSuggestionClick} onTopicClick={onTopicClick} selectedTopic={selectedTopic} brainstormTitle={activeBrainstorm?.title} exploringTopic={exploringTopic} hasClassified={hasClassified} />
+                                    <CanvasTab mapData={mapData} libraryData={libraryData} brainstormingId={activeBrainstorm?.id} onRefresh={onRefreshMap} onSuggestionClick={onSuggestionClick} onTopicClick={onTopicClick} onTopicMove={onTopicMove} onDeleteTopic={onDeleteTopic} onUpdateTopic={onUpdateTopic} onEdgeCreate={onEdgeCreate} onEdgeDelete={onEdgeDelete} selectedTopic={selectedTopic} exploringSuggestion={exploringSuggestion} hasClassified={hasClassified} onAddBlankTopic={onAddBlankTopic} onGenerateContent={onGenerateContent} onUpdateOutline={onUpdateOutline} onExploreConnection={onExploreConnection} />
                                 </Suspense>
                             </ErrorBoundary>
                         )}

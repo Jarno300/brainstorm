@@ -9,7 +9,7 @@ from app.database import SessionLocal
 from app.services.brainstorm_service import get_brainstorm
 from app.services.realtime_service import brainstorm_event_channel, create_async_redis_client
 
-router = APIRouter(prefix="/api", tags=["realtime"])
+router = APIRouter(prefix="", tags=["realtime"])
 
 
 async def _authenticate_ws(websocket: WebSocket, token: str | None) -> dict | None:

@@ -62,7 +62,7 @@ class SharedBrainstormResponse(BaseModel):
 
 # ─── Auth-required: manage share tokens ──────────────────────
 
-@router.post("/api/brainstorms/{brainstorm_id}/share")
+@router.post("/brainstorms/{brainstorm_id}/share")
 def enable_sharing(brainstorm_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Generate or return a share token for a brainstorm."""
     token = generate_share_token(db, brainstorm_id, current_user.id)
@@ -72,7 +72,7 @@ def enable_sharing(brainstorm_id: uuid.UUID, db: Session = Depends(get_db), curr
     return ShareResponse(share_url=f"{host}/shared/{token}")
 
 
-@router.delete("/api/brainstorms/{brainstorm_id}/share")
+@router.delete("/brainstorms/{brainstorm_id}/share")
 def disable_sharing(brainstorm_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Revoke a share token."""
     revoked = revoke_share_token(db, brainstorm_id, current_user.id)
@@ -83,7 +83,7 @@ def disable_sharing(brainstorm_id: uuid.UUID, db: Session = Depends(get_db), cur
 
 # ─── Public endpoints (no auth) ──────────────────────────────
 
-@router.get("/api/share/{token}")
+@router.get("/share/{token}")
 def get_shared_brainstorm(token: uuid.UUID, db: Session = Depends(get_db)):
     """View a published brainstorm in read-only mode."""
     brainstorm = get_brainstorm_by_share_token(db, token)

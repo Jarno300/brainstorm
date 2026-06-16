@@ -19,7 +19,7 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/brainstorms", tags=["export"])
+router = APIRouter(prefix="/brainstorms", tags=["export"])
 
 
 def _serialize(obj):

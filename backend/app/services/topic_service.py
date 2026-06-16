@@ -17,6 +17,7 @@ def create_topic(
     library_path: str = "",
     is_proposition: bool = False,
     confidence: float = 0.0,
+    outline: Optional[list] = None,
     commit: bool = True,
 ) -> Topic:
     topic = Topic(
@@ -26,6 +27,7 @@ def create_topic(
         library_path=library_path,
         is_proposition=is_proposition,
         confidence=confidence,
+        outline=outline,
     )
     db.add(topic)
     if commit:

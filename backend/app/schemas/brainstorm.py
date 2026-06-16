@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 import uuid
@@ -6,7 +6,11 @@ import uuid
 
 class BrainstormCreate(BaseModel):
     title: Optional[str] = "New Brainstorm"
-    model: Optional[str] = "ollama/llama3.2:1b"
+    model: Optional[str] = "deepseek/deepseek-chat"
+
+
+class BrainstormTitleUpdate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
 
 
 class BrainstormModelUpdate(BaseModel):

@@ -3,7 +3,7 @@ from typing import List, Dict
 
 from app.services.ai_service import get_model_options
 
-router = APIRouter(prefix="/api/models", tags=["models"])
+router = APIRouter(prefix="/models", tags=["models"])
 
 
 @router.get("/")

@@ -25,6 +25,10 @@ from app.services.topic_service import (
 from app.services.map_suggestion_service import rebuild_map_suggestions
 from app.services.library_service import create_library_entry
 from app.services.brainstorm_service import get_brainstorm, update_brainstorm_title
+from app.services.topic_enrichment_service import (
+    generate_library_content,
+    generate_topic_taxonomy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +61,25 @@ STOPWORDS = {
 PROMPT_TOPIC_PATTERNS = [
     r"^\s*(?:explain|tell me about|what is|describe)\s+(.+?)\s*[\.!?]*\s*$",
 ]
+
+
+def _taxonomy_to_markdown(taxonomy: dict) -> str:
+    """Convert a taxonomy dict to markdown sections for library entries."""
+    sections = []
+    for key, heading in [
+        ("parent_topics", "Parent Topics"),
+        ("child_topics", "Child Topics"),
+        ("related_topics", "Related Topics"),
+    ]:
+        items = taxonomy.get(key, [])
+        if items:
+            lines = [f"## {heading}", ""]
+            for item in items:
+                name = item.get("name", "unknown")
+                desc = item.get("description", "")
+                lines.append(f"- {name} - {desc}")
+            sections.append("\n".join(lines))
+    return "\n\n".join(sections)
 
 
 def clean_topic_candidate(candidate: str) -> str:
@@ -143,7 +166,12 @@ def rebuild_propositions_and_title(db, brainstorm_id: uuid.UUID, title_candidate
 
     brainstorm = get_brainstorm(db, brainstorm_id)
     if brainstorm and brainstorm.title == "New Brainstorm" and title_candidate:
-        update_brainstorm_title(db, brainstorm_id, title_candidate["name"].replace("-", " ").title())
+        try:
+            name = title_candidate.get("name", "")
+            if name:
+                update_brainstorm_title(db, brainstorm_id, name.replace("-", " ").title())
+        except Exception as e:
+            logger.warning("Failed to update brainstorm title from candidate %s: %s", title_candidate, e)
 
     if commit:
         db.commit()
@@ -165,9 +193,23 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
         commit=False,
     )
 
-    # Use the last assistant response as the library entry — no re-summarization
-    assistant_msgs = [m for m in messages if m.role.value == "assistant" and m.content.strip()]
-    md_content = assistant_msgs[-1].content if assistant_msgs else f"# {promoted_topic.name}\n\n*No content yet.*"
+    # Generate structured library content via LLM instead of raw assistant dump
+    enriched_content = generate_library_content(
+        topic_name=promoted_topic.name,
+        conversation_text=conversation_text,
+    )
+
+    # Append taxonomy sections from the LLM taxonomy service
+    taxonomy = generate_topic_taxonomy(
+        topic_name=promoted_topic.name,
+        library_content=enriched_content,
+        conversation_text=conversation_text,
+    )
+    if taxonomy:
+        taxonomy_md = _taxonomy_to_markdown(taxonomy)
+        if taxonomy_md:
+            enriched_content += "\n\n" + taxonomy_md
+
     file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
     entry = create_library_entry(
         db=db,
@@ -175,7 +217,7 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
         topic_id=promoted_topic.id,
         folder_name=promoted_topic.name,
         file_name=file_name,
-        content=md_content,
+        content=enriched_content,
         commit=False,
     )
 
@@ -192,10 +234,12 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
 def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, conversation_text: str):
     """Extract topics from conversation and create them with library entries.
 
-    Uses the simple comma-separated extraction (1 LLM call) and the
-    last AI response as the library entry (no re-summarization).
+    Uses the JSON extraction (1 LLM call) with fallback to line-by-line
+    if the model can't produce structured JSON.
+    For the primary topic, generates structured library content and
+    taxonomy (parent/child/related topics).
     """
-    topic_names = extract_topics(conversation_text)
+    topic_list = extract_topics(conversation_text, use_fallback=True)
     primary_topic_name = infer_primary_topic_name(messages)
     existing_topics = get_topics(db, brainstorm_id)
     existing_topic_names = {
@@ -204,18 +248,18 @@ def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, co
         if not t.is_proposition
     }
 
-    # Use the last assistant message as the library entry content
-    assistant_msgs = [m for m in messages if m.role.value == "assistant" and m.content.strip()]
-    assistant_content = assistant_msgs[-1].content if assistant_msgs else ""
-
-    if not topic_names:
+    if not topic_list:
         if primary_topic_name:
-            topic_names = [primary_topic_name.lower().replace(" ", "-")]
+            topic_list = [{"name": primary_topic_name.lower().replace(" ", "-"), "description": ""}]
         else:
             return []
 
     created_topics = []
-    for index, name in enumerate(topic_names):
+    for index, topic_data in enumerate(topic_list):
+        name = topic_data.get("name", "unknown")
+        description = topic_data.get("description", "")
+        confidence = float(topic_data.get("confidence", 0.5))
+
         # Primary topic takes priority
         if index == 0 and primary_topic_name:
             name = primary_topic_name.lower().replace(" ", "-")
@@ -223,22 +267,38 @@ def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, co
         if name in existing_topic_names:
             continue
 
-        # First topic becomes a main node; rest become suggestion propositions
+        # First topic is always the main node; everything else is a proposition
         is_prop = index > 0
 
         topic = create_topic(
             db=db,
             brainstorm_id=brainstorm_id,
             name=name,
-            description=f"Explored during conversation.",
+            description=description if description else "Explored during conversation.",
             is_proposition=is_prop,
-            confidence=0.6 if not is_prop else 0.3,
+            confidence=confidence,
             commit=False,
         )
 
-        # Only create library entries for main topics (not propositions)
+        # Generate structured library content for main topics
         if not is_prop:
-            md_content = assistant_content if assistant_content else f"# {name}\n\n*This topic was discussed in the conversation.*"
+            # Use LLM to generate structured markdown
+            enriched = generate_library_content(
+                topic_name=name,
+                conversation_text=conversation_text,
+            )
+
+            # Append taxonomy sections so rebuild_map_suggestions can parse them
+            taxonomy = generate_topic_taxonomy(
+                topic_name=name,
+                library_content=enriched,
+                conversation_text=conversation_text,
+            )
+            if taxonomy:
+                taxonomy_md = _taxonomy_to_markdown(taxonomy)
+                if taxonomy_md:
+                    enriched += "\n\n" + taxonomy_md
+
             file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
             entry = create_library_entry(
                 db=db,
@@ -246,7 +306,7 @@ def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, co
                 topic_id=topic.id,
                 folder_name=name,
                 file_name=file_name,
-                content=md_content,
+                content=enriched,
                 commit=False,
             )
             topic.library_path = entry.file_path
@@ -284,10 +344,12 @@ def _process_message_classification(db, brainstorm_id: uuid.UUID):
     t0 = time.perf_counter()
     logger.debug("classification_pipeline start | brainstorm_id=%s", brainstorm_id)
 
+    # Load all messages for classification (up to 500 to keep prompt size reasonable)
     messages = (
         db.query(Message)
         .filter(Message.brainstorm_id == brainstorm_id)
         .order_by(Message.created_at)
+        .limit(500)
         .all()
     )
 
@@ -330,13 +392,15 @@ def _process_message_classification(db, brainstorm_id: uuid.UUID):
     }
 
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(bind=True, max_retries=2)
 def process_message_classification(self, brainstorm_id_str: str):
     """
     Process a brainstorm's messages to:
     1. Classify topics
     2. Generate library entries
     3. Propose related topics for the map
+
+    Publishes classification_complete or classification_error via Redis PubSub.
     """
     brainstorm_id = uuid.UUID(brainstorm_id_str)
     db = SessionLocal()
@@ -344,13 +408,49 @@ def process_message_classification(self, brainstorm_id_str: str):
     try:
         result = _process_message_classification(db, brainstorm_id)
         from app.services.realtime_service import publish_brainstorm_event
+
+        # Even "no_topics_found" is a valid outcome — not an error.
+        # Only publish as error if the pipeline itself raised an exception.
         publish_brainstorm_event("classification_complete", brainstorm_id, result)
         return result
+
     except Exception as e:
         from app.services.realtime_service import publish_brainstorm_event
-        publish_brainstorm_event("classification_error", brainstorm_id, {"error": str(e)})
-        self.retry(exc=e, countdown=60)
-        return {"status": "error", "error": str(e)}
+        import traceback
+
+        error_type = type(e).__name__
+        error_msg = str(e)[:500]
+        trace = traceback.format_exc()[-500:]  # last 500 chars of stack trace
+
+        logger.error(
+            "classification_error | brainstorm=%s type=%s error=%s trace=%s",
+            brainstorm_id, error_type, error_msg, trace,
+        )
+
+        publish_brainstorm_event("classification_error", brainstorm_id, {
+            "error": error_msg,
+            "stage": "classification_pipeline",
+            "type": error_type,
+            "retry": self.request.retries < self.max_retries,
+            "trace": trace,
+        })
+
+        logger.error(
+            "classification_task_error | brainstorm=%s type=%s error=%s",
+            brainstorm_id, error_type, error_msg,
+            exc_info=True,
+        )
+
+        logger.error(
+            "classification_error | brainstorm=%s error=%s retries=%d/%d",
+            brainstorm_id, error_msg, self.request.retries, self.max_retries,
+        )
+
+        # Only retry on transient errors (LLM timeout, DB connection)
+        if "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+            raise self.retry(exc=e, countdown=30)
+
+        return {"status": "error", "error": error_msg}
     finally:
         db.close()
 
