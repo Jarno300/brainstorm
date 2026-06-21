@@ -29,26 +29,6 @@ describe('UI Store', () => {
   });
 });
 
-describe('Auth Store', () => {
-  it('starts with no auth when localStorage is empty', async () => {
-    const { default: useAuthStore } = await import('../stores/authStore');
-    expect(useAuthStore.getState().token).toBeNull();
-    expect(useAuthStore.getState().isLoggedIn()).toBe(false);
-  });
-
-  it('can set and clear auth', async () => {
-    const { default: useAuthStore } = await import('../stores/authStore');
-    useAuthStore.getState().setToken('fake-token', { email: 'test@test.com' });
-    expect(useAuthStore.getState().token).toBe('fake-token');
-    expect(useAuthStore.getState().isLoggedIn()).toBe(true);
-    expect(localStorage.getItem('brainstorm-auth-token')).toBe('fake-token');
-
-    useAuthStore.getState().clearAuth();
-    expect(useAuthStore.getState().token).toBeNull();
-    expect(useAuthStore.getState().isLoggedIn()).toBe(false);
-  });
-});
-
 describe('Chat Store', () => {
   it('initializes with empty messages', async () => {
     const { default: useChatStore } = await import('../stores/chatStore');

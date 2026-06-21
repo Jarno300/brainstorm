@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import {
-  fetchBrainstorms,
-  fetchBrainstorm,
-  createNewBrainstorm,
-  removeBrainstorm,
-  renameBrainstorm,
-  changeBrainstormModel,
-} from '../services/brainstormService';
+  listBrainstorms,
+  createBrainstorm,
+  getBrainstorm,
+  deleteBrainstorm,
+  updateBrainstormTitle,
+  updateBrainstormModel,
+} from '../api';
 import logger from '../utils/logger';
 
 const useBrainstormStore = create((set, get) => ({
@@ -20,13 +20,25 @@ const useBrainstormStore = create((set, get) => ({
   // Actions
 
   loadList: async () => {
-    const data = await fetchBrainstorms();
-    set({ brainstorms: data });
-    return data;
+    try {
+      const res = await listBrainstorms();
+      set({ brainstorms: res.data });
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to load brainstorms:', err);
+      set({ brainstorms: [] });
+      return [];
+    }
   },
 
   loadDetail: async (id) => {
-    return fetchBrainstorm(id);
+    try {
+      const res = await getBrainstorm(id);
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to load brainstorm:', err);
+      return null;
+    }
   },
 
   selectBrainstorm: async (brainstorm) => {
@@ -37,10 +49,10 @@ const useBrainstormStore = create((set, get) => ({
 
   create: async (title) => {
     try {
-      const data = await createNewBrainstorm(title);
-      set({ activeBrainstorm: data });
+      const res = await createBrainstorm({ title });
+      set({ activeBrainstorm: res.data });
       await get().loadList();
-      return data;
+      return res.data;
     } catch (err) {
       logger.error('Failed to create brainstorm:', err);
       throw err;
@@ -57,7 +69,7 @@ const useBrainstormStore = create((set, get) => ({
     if (!target) return;
     set({ deleting: true });
     try {
-      await removeBrainstorm(target.id);
+      await deleteBrainstorm(target.id);
       const next = await get().loadList();
       const wasActive = get().activeBrainstorm?.id === target.id;
       set({ deleteTarget: null, deleting: false });
@@ -82,14 +94,23 @@ const useBrainstormStore = create((set, get) => ({
   },
 
   updateTitle: async (id, title) => {
-    const data = await renameBrainstorm(id, title);
-    set({ reloadKey: get().reloadKey + 1 });
-    return data;
+    try {
+      const res = await updateBrainstormTitle(id, title);
+      set({ reloadKey: get().reloadKey + 1 });
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to rename brainstorm:', err);
+    }
   },
 
   updateModel: async (id, model) => {
-    const updated = await changeBrainstormModel(id, model);
-    if (updated) set({ activeBrainstorm: updated });
+    try {
+      await updateBrainstormModel(id, model);
+      const res = await getBrainstorm(id);
+      if (res.data) set({ activeBrainstorm: res.data });
+    } catch (err) {
+      logger.error('Failed to update model:', err);
+    }
   },
 
   clear: () => set({

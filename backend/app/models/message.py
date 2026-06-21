@@ -27,6 +27,8 @@ class Message(Base):
     # Branching support
     branch_id = Column(UUID(as_uuid=True), nullable=True, index=True, default=None)
     parent_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True, default=None)
+    # Topic-scoped comments (NULL = regular chat message)
+    topic_id = Column(UUID(as_uuid=True), ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True, default=None)
 
     brainstorm = relationship("Brainstorm", back_populates="messages")
     parent_message = relationship("Message", remote_side="Message.id", backref="children")

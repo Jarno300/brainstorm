@@ -1,3 +1,14 @@
+"""
+AI service — multi-provider LLM abstraction over direct HTTP calls.
+
+Providers:
+  - OpenAICompatibleProvider  → OpenAI, DeepSeek, and OpenAI-compatible APIs
+  - AnthropicChatProvider     → Anthropic Messages API
+  - OllamaProvider            → Ollama chat / generate APIs
+
+No LangChain dependency — all providers use httpx directly.
+"""
+
 import json
 import time
 import logging
@@ -5,10 +16,8 @@ from dataclasses import dataclass
 from typing import AsyncIterator, List, Optional, Protocol, Tuple
 
 import httpx
-from langchain_community.chat_models import ChatOllama
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from sqlalchemy.orm import Session
+
 from app.config import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_API_VERSION,
@@ -28,6 +37,10 @@ from app.models.provider_setting import ProviderSetting
 logger = logging.getLogger(__name__)
 
 
+# ═══════════════════════════════════════════════════════════════
+# Types
+# ═══════════════════════════════════════════════════════════════
+
 @dataclass(frozen=True)
 class ResolvedModel:
     provider: str
@@ -35,101 +48,193 @@ class ResolvedModel:
 
 
 class ChatProvider(Protocol):
-    async def ainvoke(self, messages: List):
-        ...
+    """Interface for all chat providers.  Messages are dicts with role/content."""
 
-    def invoke(self, messages: List):
-        ...
+    def invoke(self, messages: List[dict]) -> str: ...
+
+    async def ainvoke(self, messages: List[dict]) -> str: ...
+
+    async def astream(self, messages: List[dict]) -> AsyncIterator[str]: ...
 
 
-class AnthropicResponse:
-    def __init__(self, content: str):
-        self.content = content
+# ═══════════════════════════════════════════════════════════════
+# OpenAI-compatible provider (OpenAI, DeepSeek, any compatible API)
+# ═══════════════════════════════════════════════════════════════
 
+class OpenAICompatibleProvider:
+    """Chat provider for OpenAI and OpenAI-compatible APIs (DeepSeek, etc.).
+
+    Uses the /v1/chat/completions endpoint with streaming SSE support.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        base_url: str,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+    ):
+        self.model = model
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+
+    def _build_payload(self, messages: List[dict], stream: bool = False) -> dict:
+        return {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            "stream": stream,
+        }
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+    def _extract_content(self, response_json: dict) -> str:
+        choices = response_json.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "") or ""
+        return ""
+
+    def invoke(self, messages: List[dict]) -> str:
+        response = httpx.post(
+            f"{self.base_url}/v1/chat/completions",
+            headers=self._headers(),
+            json=self._build_payload(messages, stream=False),
+            timeout=120,
+        )
+        response.raise_for_status()
+        return self._extract_content(response.json())
+
+    async def ainvoke(self, messages: List[dict]) -> str:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                f"{self.base_url}/v1/chat/completions",
+                headers=self._headers(),
+                json=self._build_payload(messages, stream=False),
+            )
+            response.raise_for_status()
+            return self._extract_content(response.json())
+
+    async def astream(self, messages: List[dict]) -> AsyncIterator[str]:
+        """Stream tokens from OpenAI-compatible chat completions SSE."""
+        payload = self._build_payload(messages, stream=True)
+        async with httpx.AsyncClient(timeout=300) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/v1/chat/completions",
+                headers=self._headers(),
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[len("data: "):]
+                    if not data.strip() or data.strip() == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(data)
+                        choices = event.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue
+
+
+# ═══════════════════════════════════════════════════════════════
+# Anthropic provider
+# ═══════════════════════════════════════════════════════════════
 
 class AnthropicChatProvider:
+    """Chat provider for the Anthropic Messages API.
+
+    Messages are plain dicts with role/content keys.
+    """
+
     def __init__(self, model: str, api_key: str, base_url: str, max_tokens: int = 4096):
         self.model = model
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.max_tokens = max_tokens
 
-    def _build_payload(self, messages: List) -> dict:
+    def _build_payload(self, messages: List[dict], stream: bool = False) -> dict:
         system_parts = []
         anthropic_messages = []
 
-        for message in messages:
-            role = getattr(message, "type", None) or message.get("role")
-            content = getattr(message, "content", None) if not isinstance(message, dict) else message.get("content")
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
             if role == "system":
                 system_parts.append(content)
-                continue
-
-            if role in {"human", "user"}:
+            elif role in ("user", "human"):
                 anthropic_messages.append({"role": "user", "content": content})
-                continue
-
-            if role in {"ai", "assistant"}:
+            elif role in ("assistant", "ai"):
                 anthropic_messages.append({"role": "assistant", "content": content})
-                continue
 
-            if role not in {"user", "assistant"}:
-                continue
-
-        payload = {
+        payload: dict = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "messages": anthropic_messages,
         }
+        if stream:
+            payload["stream"] = True
         if system_parts:
             payload["system"] = "\n\n".join(system_parts)
         return payload
 
-    def _extract_text(self, response_json: dict) -> str:
+    @staticmethod
+    def _extract_text(response_json: dict) -> str:
         parts = response_json.get("content", [])
-        return "".join(part.get("text", "") for part in parts if part.get("type") == "text")
+        return "".join(
+            part.get("text", "") for part in parts if part.get("type") == "text"
+        )
 
-    def invoke(self, messages: List[dict]):
+    def _headers(self) -> dict:
+        return {
+            "x-api-key": self.api_key,
+            "anthropic-version": ANTHROPIC_API_VERSION,
+            "content-type": "application/json",
+        }
+
+    def invoke(self, messages: List[dict]) -> str:
         response = httpx.post(
             f"{self.base_url}/v1/messages",
-            headers={
-                "x-api-key": self.api_key,
-                "anthropic-version": ANTHROPIC_API_VERSION,
-                "content-type": "application/json",
-            },
-            json=self._build_payload(messages),
+            headers=self._headers(),
+            json=self._build_payload(messages, stream=False),
             timeout=120,
         )
         response.raise_for_status()
-        return AnthropicResponse(self._extract_text(response.json()))
+        return self._extract_text(response.json())
 
-    async def ainvoke(self, messages: List[dict]):
+    async def ainvoke(self, messages: List[dict]) -> str:
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 f"{self.base_url}/v1/messages",
-                headers={
-                    "x-api-key": self.api_key,
-                    "anthropic-version": ANTHROPIC_API_VERSION,
-                    "content-type": "application/json",
-                },
-                json=self._build_payload(messages),
+                headers=self._headers(),
+                json=self._build_payload(messages, stream=False),
             )
             response.raise_for_status()
-            return AnthropicResponse(self._extract_text(response.json()))
+            return self._extract_text(response.json())
 
     async def astream(self, messages: List[dict]) -> AsyncIterator[str]:
         """Stream tokens from Anthropic Messages API via SSE."""
-        payload = self._build_payload(messages)
-        payload["stream"] = True
+        payload = self._build_payload(messages, stream=True)
         async with httpx.AsyncClient(timeout=300) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/v1/messages",
-                headers={
-                    "x-api-key": self.api_key,
-                    "anthropic-version": ANTHROPIC_API_VERSION,
-                    "content-type": "application/json",
-                },
+                headers=self._headers(),
                 json=payload,
             ) as response:
                 response.raise_for_status()
@@ -149,11 +254,101 @@ class AnthropicChatProvider:
                         continue
 
 
+# ═══════════════════════════════════════════════════════════════
+# Ollama provider
+# ═══════════════════════════════════════════════════════════════
+
+class OllamaProvider:
+    """Chat provider for Ollama's local chat API.
+
+    Uses /api/chat for messages, /api/generate for structured JSON output.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        base_url: str,
+        num_predict: int = 2048,
+        num_ctx: int = 4096,
+        keep_alive: str = "30m",
+        temperature: float = 0.7,
+    ):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.num_predict = num_predict
+        self.num_ctx = num_ctx
+        self.keep_alive = keep_alive
+        self.temperature = temperature
+
+    def _options(self) -> dict:
+        return {
+            "temperature": self.temperature,
+            "num_predict": self.num_predict,
+            "num_ctx": self.num_ctx,
+        }
+
+    def _build_payload(self, messages: List[dict], stream: bool = False) -> dict:
+        return {
+            "model": self.model,
+            "messages": messages,
+            "stream": stream,
+            "options": self._options(),
+            "keep_alive": self.keep_alive,
+        }
+
+    def invoke(self, messages: List[dict]) -> str:
+        response = httpx.post(
+            f"{self.base_url}/api/chat",
+            json=self._build_payload(messages, stream=False),
+            timeout=300,
+        )
+        response.raise_for_status()
+        return response.json().get("message", {}).get("content", "")
+
+    async def ainvoke(self, messages: List[dict]) -> str:
+        async with httpx.AsyncClient(timeout=300) as client:
+            response = await client.post(
+                f"{self.base_url}/api/chat",
+                json=self._build_payload(messages, stream=False),
+            )
+            response.raise_for_status()
+            return response.json().get("message", {}).get("content", "")
+
+    async def astream(self, messages: List[dict]) -> AsyncIterator[str]:
+        """Stream tokens from Ollama chat API.
+
+        Each SSE line is a JSON object with {"message": {"content": "..."}, "done": false}.
+        """
+        payload = self._build_payload(messages, stream=True)
+        async with httpx.AsyncClient(timeout=300) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                        content = chunk.get("message", {}).get("content", "")
+                        if content:
+                            yield content
+                    except json.JSONDecodeError:
+                        continue
+
+
+# ═══════════════════════════════════════════════════════════════
+# Structured JSON generation (Ollama-specific path)
+# ═══════════════════════════════════════════════════════════════
+
 def _ollama_generate_json_sync(prompt: str, model_name: str) -> str:
-    """Generate structured JSON from Ollama — tuned for speed on classification."""
+    """Generate structured JSON from Ollama — tuned for speed on classification tasks."""
     t0 = time.perf_counter()
     prompt_chars = len(prompt)
     logger.debug("Ollama JSON gen start | model=%s prompt_chars=%d", model_name, prompt_chars)
+
     response = httpx.post(
         f"{OLLAMA_BASE_URL.rstrip('/')}/api/generate",
         json={
@@ -163,8 +358,8 @@ def _ollama_generate_json_sync(prompt: str, model_name: str) -> str:
             "format": "json",
             "options": {
                 "temperature": 0.1,
-                "num_predict": 512,       # classification responses are short
-                "num_ctx": 4096,           # enough for the prompt + response
+                "num_predict": 512,
+                "num_ctx": 4096,
             },
             "keep_alive": OLLAMA_KEEP_ALIVE,
         },
@@ -174,12 +369,20 @@ def _ollama_generate_json_sync(prompt: str, model_name: str) -> str:
     response.raise_for_status()
     payload = response.json()
     generated = payload.get("response", "")
+
     if not generated:
         raise ValueError("Ollama returned an empty structured response")
-    logger.debug("Ollama JSON gen done  | model=%s elapsed=%.2fs prompt_chars=%d response_chars=%d",
-                 model_name, elapsed, prompt_chars, len(generated))
+
+    logger.debug(
+        "Ollama JSON gen done  | model=%s elapsed=%.2fs prompt_chars=%d response_chars=%d",
+        model_name, elapsed, prompt_chars, len(generated),
+    )
     return generated
 
+
+# ═══════════════════════════════════════════════════════════════
+# Model resolution
+# ═══════════════════════════════════════════════════════════════
 
 def normalize_model_name(model: str) -> str:
     return str(model or "").strip()
@@ -204,7 +407,7 @@ def get_chat_model(
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     max_tokens: int = 4096,
-):
+) -> ChatProvider:
     """Return a chat provider instance.
 
     Resolution order for credentials:
@@ -212,23 +415,20 @@ def get_chat_model(
       2. ProviderSetting from database (see settings API)
       3. Environment variables
       4. Hardcoded defaults
-
-    max_tokens is used by Anthropic (required) and optionally by OpenAI.
-    For Ollama, OLLAMA_NUM_PREDICT env var controls the default.
     """
     resolved = resolve_model_spec(model)
 
     if resolved.provider == "ollama":
-        return ChatOllama(
+        return OllamaProvider(
             model=resolved.model_name,
             base_url=base_url or OLLAMA_BASE_URL,
-            temperature=0.7,
             num_predict=OLLAMA_NUM_PREDICT,
             num_ctx=OLLAMA_NUM_CTX,
             keep_alive=OLLAMA_KEEP_ALIVE,
+            temperature=0.7,
         )
 
-    # DeepSeek — OpenAI-compatible API, uses ChatOpenAI with custom base URL
+    # DeepSeek — OpenAI-compatible API
     if resolved.provider == "deepseek":
         key = api_key or DEEPSEEK_API_KEY
         if not key:
@@ -237,11 +437,10 @@ def get_chat_model(
                 "Set DEEPSEEK_API_KEY in your environment or "
                 "provide one via Settings → Add Model."
             )
-        return ChatOpenAI(
+        return OpenAICompatibleProvider(
             model=resolved.model_name,
             api_key=key,
             base_url=base_url or DEEPSEEK_BASE_URL,
-            temperature=0.7,
             max_tokens=max_tokens,
         )
 
@@ -253,10 +452,12 @@ def get_chat_model(
                 "Set OPENAI_API_KEY in your environment or "
                 "provide one via Settings → Add Model."
             )
-        kwargs = {"model": resolved.model_name, "api_key": key, "temperature": 0.7, "max_tokens": max_tokens}
-        if base_url:
-            kwargs["base_url"] = base_url
-        return ChatOpenAI(**kwargs)
+        return OpenAICompatibleProvider(
+            model=resolved.model_name,
+            api_key=key,
+            base_url=base_url or "https://api.openai.com",
+            max_tokens=max_tokens,
+        )
 
     # Anthropic
     key = api_key or ANTHROPIC_API_KEY
@@ -274,17 +475,9 @@ def get_chat_model(
     )
 
 
-def convert_messages_to_langchain(messages: List[dict]) -> List:
-    lc_messages = []
-    for msg in messages:
-        if msg["role"] == "user":
-            lc_messages.append(HumanMessage(content=msg["content"]))
-        elif msg["role"] == "assistant":
-            lc_messages.append(AIMessage(content=msg["content"]))
-        elif msg["role"] == "system":
-            lc_messages.append(SystemMessage(content=msg["content"]))
-    return lc_messages
-
+# ═══════════════════════════════════════════════════════════════
+# Public API — same signatures, no LangChain dependency
+# ═══════════════════════════════════════════════════════════════
 
 async def chat_with_model(
     messages: List[dict],
@@ -293,10 +486,9 @@ async def chat_with_model(
     base_url: Optional[str] = None,
     max_tokens: int = 4096,
 ) -> str:
-    chat_model = get_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=max_tokens)
-    lc_messages = convert_messages_to_langchain(messages)
-    response = await chat_model.ainvoke(lc_messages)
-    return response.content
+    """Send messages to the chat model and return the full response (async)."""
+    provider = get_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=max_tokens)
+    return await provider.ainvoke(messages)
 
 
 def chat_with_model_sync(
@@ -306,18 +498,21 @@ def chat_with_model_sync(
     base_url: Optional[str] = None,
     max_tokens: int = 4096,
 ) -> str:
+    """Send messages to the chat model and return the full response (sync)."""
     t0 = time.perf_counter()
     resolved = resolve_model_spec(model)
-    logger.debug("Chat sync start | provider=%s model=%s msgs=%d",
-                 resolved.provider, resolved.model_name, len(messages))
-    chat_model = get_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=max_tokens)
-    lc_messages = convert_messages_to_langchain(messages)
-    response = chat_model.invoke(lc_messages)
+    logger.debug(
+        "Chat sync start | provider=%s model=%s msgs=%d",
+        resolved.provider, resolved.model_name, len(messages),
+    )
+    provider = get_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=max_tokens)
+    result = provider.invoke(messages)
     elapsed = time.perf_counter() - t0
-    resp_len = len(response.content) if hasattr(response, 'content') else 0
-    logger.debug("Chat sync done  | provider=%s model=%s elapsed=%.2fs response_chars=%d",
-                 resolved.provider, resolved.model_name, elapsed, resp_len)
-    return response.content
+    logger.debug(
+        "Chat sync done  | provider=%s model=%s elapsed=%.2fs response_chars=%d",
+        resolved.provider, resolved.model_name, elapsed, len(result),
+    )
+    return result
 
 
 async def stream_chat_with_model(
@@ -329,54 +524,45 @@ async def stream_chat_with_model(
 ) -> AsyncIterator[str]:
     """Stream tokens from the chat model as they are generated.
 
-    Yields content chunks for all providers:
-    - Ollama / OpenAI / DeepSeek: uses LangChain astream()
-    - Anthropic: uses custom SSE streaming
+    Yields content chunks for all providers (OpenAI-compatible, Anthropic, Ollama).
     """
     t0 = time.perf_counter()
     resolved = resolve_model_spec(model)
-    logger.debug("Stream start | provider=%s model=%s msgs=%d",
-                 resolved.provider, resolved.model_name, len(messages))
-    chat_model = get_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=max_tokens)
-    lc_messages = convert_messages_to_langchain(messages)
+    logger.debug(
+        "Stream start | provider=%s model=%s msgs=%d",
+        resolved.provider, resolved.model_name, len(messages),
+    )
+    provider = get_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=max_tokens)
+
     token_count = 0
+    total_chars = 0
     first_token = True
 
-    # Anthropic uses its own streaming implementation
-    if isinstance(chat_model, AnthropicChatProvider):
-        async for token in chat_model.astream(lc_messages):
-            if first_token:
-                ttfb = time.perf_counter() - t0
-                logger.debug("Stream TTFB  | provider=%s model=%s ttfb=%.2fs",
-                             resolved.provider, resolved.model_name, ttfb)
-                first_token = False
-            token_count += 1
-            yield token
-        elapsed = time.perf_counter() - t0
-        logger.debug("Stream done  | provider=%s model=%s elapsed=%.2fs tokens=%d chars=%d",
-                     resolved.provider, resolved.model_name, elapsed, token_count, sum(1 for _ in ""))
-        return
+    async for token in provider.astream(messages):
+        if first_token:
+            ttfb = time.perf_counter() - t0
+            logger.debug(
+                "Stream TTFB  | provider=%s model=%s ttfb=%.2fs",
+                resolved.provider, resolved.model_name, ttfb,
+            )
+            first_token = False
+        token_count += 1
+        total_chars += len(token)
+        yield token
 
-    # LangChain providers (Ollama, OpenAI) support astream() natively
-    total_chars = 0
-    async for chunk in chat_model.astream(lc_messages):
-        content = chunk.content if hasattr(chunk, "content") else ""
-        if content:
-            if first_token:
-                ttfb = time.perf_counter() - t0
-                logger.debug("Stream TTFB  | provider=%s model=%s ttfb=%.2fs",
-                             resolved.provider, resolved.model_name, ttfb)
-                first_token = False
-            token_count += 1
-            total_chars += len(content)
-            yield content
     elapsed = time.perf_counter() - t0
-    logger.debug("Stream done  | provider=%s model=%s elapsed=%.2fs tokens=%d chars=%d",
-                 resolved.provider, resolved.model_name, elapsed, token_count, total_chars)
+    logger.debug(
+        "Stream done  | provider=%s model=%s elapsed=%.2fs tokens=%d chars=%d",
+        resolved.provider, resolved.model_name, elapsed, token_count, total_chars,
+    )
 
 
 def generate_structured_json_sync(prompt: str, model: Optional[str] = None) -> str:
-    """Generate structured output, optionally using a dedicated classification model."""
+    """Generate structured output, optionally using a dedicated classification model.
+
+    For Ollama, uses the /api/generate endpoint with format=json for reliability.
+    For other providers, uses the standard chat completion API.
+    """
     effective_model = model or CLASSIFICATION_MODEL or DEFAULT_MODEL
     resolved = resolve_model_spec(effective_model)
 
@@ -385,6 +571,10 @@ def generate_structured_json_sync(prompt: str, model: Optional[str] = None) -> s
 
     return chat_with_model_sync([{"role": "user", "content": prompt}], model=model)
 
+
+# ═══════════════════════════════════════════════════════════════
+# Credentials & model options
+# ═══════════════════════════════════════════════════════════════
 
 def resolve_credentials(
     db: Session,

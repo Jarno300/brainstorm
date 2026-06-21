@@ -38,6 +38,9 @@ pyenv.cfg
 *.crt
 secrets/
 
+# ─── Dev tool config ─────────────────────────────────────
+.pi/
+
 # ─── IDE / editor ─────────────────────────────────────────
 .vscode/
 .idea/
@@ -62,6 +65,8 @@ updates/
 Thumbs.db
 Desktop.ini
 *.log
+nul
+NUL
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -77,6 +82,7 @@ docker-compose.override.yml
 backend/__pycache__/
 backend/*/__pycache__/
 backend/**/__pycache__/
+backend/**/**/__pycache__/
 backend/*.egg-info/
 backend/.eggs/
 backend/.coverage

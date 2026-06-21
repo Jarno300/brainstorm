@@ -2,6 +2,7 @@ import uuid
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
+from app.config import DEFAULT_MODEL
 from app.database import utcnow
 from app.models.brainstorm import Brainstorm
 from app.models.message import Message, MessageRole
@@ -17,7 +18,7 @@ def _active_query(db: Session):
 def create_brainstorm(db: Session, data: BrainstormCreate, user_id: uuid.UUID | None = None) -> Brainstorm:
     brainstorm = Brainstorm(
         title=data.title,
-        model=data.model or "deepseek/deepseek-chat",
+        model=data.model or DEFAULT_MODEL,
         user_id=user_id,
     )
     db.add(brainstorm)

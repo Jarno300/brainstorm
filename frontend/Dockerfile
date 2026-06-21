@@ -1,20 +1,29 @@
-FROM node:20-alpine
+# ── Build stage ──────────────────────────────────────────
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json ./
+ARG VITE_API_URL=/api/v1
+ENV VITE_API_URL=${VITE_API_URL}
 
-# Install dependencies
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source code
 COPY . .
+RUN npx vite build
 
-# Expose Vite dev server port
-EXPOSE 5173
+# ── Production stage: nginx serving built assets ──────────
+FROM nginx:1.27-alpine
 
-# Start Vite dev server with host flag
-# The API URL defaults to localhost:8000 which works because
-# Docker maps the backend container port to the host
-CMD ["npx", "vite", "--host", "0.0.0.0", "--port", "5173"]
+# Copy built files
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy nginx config that supports SPAs (client-side routing)
+COPY nginx.default.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD wget -qO- http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

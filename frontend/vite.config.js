@@ -1,13 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+    dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled', '@mui/material', '@mui/icons-material'],
   },
   optimizeDeps: {
-    include: ['@emotion/react', '@emotion/styled', '@mui/material'],
+    include: ['react', 'react-dom', '@emotion/react', '@emotion/styled', '@mui/material', '@mui/icons-material'],
   },
   server: {
     port: 5173,

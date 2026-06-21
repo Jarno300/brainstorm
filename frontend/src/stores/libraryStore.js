@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import {
-  fetchLibrary,
-  patchLibraryEntry,
-  removeLibraryEntry,
-} from '../services/libraryService';
+  getLibrary,
+  updateLibraryEntry,
+  deleteLibraryEntry,
+} from '../api';
 import logger from '../utils/logger';
 
 const useLibraryStore = create((set) => ({
@@ -13,14 +13,18 @@ const useLibraryStore = create((set) => ({
   // Actions
 
   loadLibrary: async (brainstormId) => {
-    const data = await fetchLibrary(brainstormId);
-    if (data) set({ libraryData: data });
-    return data;
+    try {
+      const res = await getLibrary(brainstormId);
+      if (res.data) set({ libraryData: res.data });
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to load library:', err);
+    }
   },
 
   updateEntry: async (entryId, content) => {
     try {
-      await patchLibraryEntry(entryId, content);
+      await updateLibraryEntry(entryId, content);
     } catch (err) {
       logger.error('Failed to update library entry:', err);
     }
@@ -28,7 +32,7 @@ const useLibraryStore = create((set) => ({
 
   deleteEntry: async (entryId) => {
     try {
-      await removeLibraryEntry(entryId);
+      await deleteLibraryEntry(entryId);
     } catch (err) {
       logger.error('Failed to delete library entry:', err);
     }

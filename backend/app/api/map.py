@@ -1,83 +1,40 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 import uuid
 import json
 from datetime import datetime, timezone
 
-from app.database import get_db, SessionLocal
+from app.database import get_db, run_in_db
 from app.schemas.topic import (
     MapDataResponse, TopicResponse, TopicEdgeResponse, SuggestionResponse,
     TopicUpdateRequest, TopicCreateRequest, EdgeCreateRequest,
 )
-from app.services import topic_service, brainstorm_service, message_service
+from app.services import topic_service, brainstorm_service
 from app.services.map_suggestion_service import rebuild_map_suggestions
+from app.services.realtime_service import (
+    publish_brainstorm_event, cache_map, get_cached_map, invalidate_map_cache,
+)
 from app.services.library_service import create_library_entry
+from app.services.gap_detection_service import detect_gaps
 from app.services.topic_enrichment_service import (
     generate_library_content,
     generate_topic_taxonomy,
 )
 from app.services.ai_service import (
     stream_chat_with_model,
-    chat_with_model_sync,
     resolve_credentials,
 )
+from app.services import map_service
 from app.api.auth import get_current_user
 from app.models.user import User
-from app.models.topic import Topic
-from app.models.topic_edge import TopicEdge
 from app.sanitize import sanitize_topic_name, sanitize_topic_description
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/map", tags=["map"])
-
-
-def _build_map_response(db: Session, brainstorm_id: uuid.UUID) -> MapDataResponse:
-    """Helper to build a full MapDataResponse with edge names and suggestions."""
-    topics = topic_service.get_topics(db, brainstorm_id)
-    edges = topic_service.get_edges(db, brainstorm_id)
-
-    # Build topic id → name lookup
-    topic_map = {t.id: t for t in topics}
-
-    # Populate source_name / target_name on edges
-    edge_responses = []
-    for e in edges:
-        source = topic_map.get(e.source_topic_id)
-        target = topic_map.get(e.target_topic_id)
-        edge_responses.append(TopicEdgeResponse(
-            id=e.id,
-            source_topic_id=e.source_topic_id,
-            target_topic_id=e.target_topic_id,
-            relationship=e.relationship,
-            weight=e.weight,
-            source_name=source.name if source else "",
-            target_name=target.name if target else "",
-        ))
-
-    # Build suggestions list: proposition topics → their parent via suggestion edges
-    suggestion_edges = [e for e in edges if e.relationship.startswith("suggestion")]
-    suggestions = []
-    for se in suggestion_edges:
-        prop = topic_map.get(se.target_topic_id)
-        source = topic_map.get(se.source_topic_id)
-        if prop and source and prop.is_proposition:
-            suggestions.append(SuggestionResponse(
-                id=prop.id,
-                name=prop.name,
-                description=prop.description,
-                source_topic_id=source.id,
-                source_topic_name=source.name,
-            ))
-
-    return MapDataResponse(
-        topics=[TopicResponse.model_validate(t) for t in topics],
-        edges=edge_responses,
-        suggestions=suggestions,
-    )
 
 
 @router.get("/{brainstorm_id}", response_model=MapDataResponse)
@@ -86,12 +43,23 @@ def get_map(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get the full knowledge map including topics, edges, and suggestions."""
+    """Get the full knowledge map including topics, edges, and suggestions.
+
+    Uses a short-lived Redis cache (5s TTL) to avoid rebuilding the
+    response on every drag/save during canvas editing.
+    """
     brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
     if not brainstorm:
         raise HTTPException(status_code=404, detail="Brainstorm not found")
 
-    return _build_map_response(db, brainstorm_id)
+    # Try Redis cache first (best-effort — fails silently if Redis is down)
+    cached = get_cached_map(brainstorm_id)
+    if cached is not None:
+        return cached
+
+    response = map_service.build_map_response(db, brainstorm_id)
+    cache_map(brainstorm_id, response.model_dump())
+    return response
 
 
 @router.post("/{brainstorm_id}/refresh", response_model=MapDataResponse)
@@ -101,9 +69,44 @@ def refresh_propositions(brainstorm_id: uuid.UUID, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="Brainstorm not found")
 
     rebuild_map_suggestions(db, brainstorm_id)
+    invalidate_map_cache(brainstorm_id)
 
     # Return updated map
-    return _build_map_response(db, brainstorm_id)
+    return map_service.build_map_response(db, brainstorm_id)
+
+
+class GapItem(BaseModel):
+    type: str
+    topic_id: str | None = None
+    topic_name: str | None = None
+    related_topic_id: str | None = None
+    related_topic_name: str | None = None
+    message: str
+    action: str
+
+
+class GapDetectionResponse(BaseModel):
+    gaps: list[GapItem]
+    total: int
+
+
+@router.get("/{brainstorm_id}/gaps", response_model=GapDetectionResponse)
+def get_gaps(
+    brainstorm_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Detect knowledge gaps in the map: orphans, disconnected clusters,
+    missing taxonomy dimensions, and poorly connected topics."""
+    brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
+    if not brainstorm:
+        raise HTTPException(status_code=404, detail="Brainstorm not found")
+
+    gaps = detect_gaps(db, brainstorm_id)
+    return GapDetectionResponse(
+        gaps=[GapItem(**g) for g in gaps],
+        total=len(gaps),
+    )
 
 
 # ─── Topic CRUD ───────────────────────────────────────────────
@@ -135,7 +138,9 @@ def update_topic(
     if data.outline is not None:
         topic.outline = [{"title": s.title} for s in data.outline]
     db.commit()
+    invalidate_map_cache(brainstorm_id)
     db.refresh(topic)
+    publish_brainstorm_event("topic_updated", brainstorm_id, {"topic_id": str(topic.id)})
     return topic
 
 
@@ -154,45 +159,9 @@ def delete_topic(
     if not topic or topic.brainstorm_id != brainstorm_id:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    # If this is a connection card, reconnect the two bridged topics
-    if topic.name.endswith("-connection"):
-        connection_edges = db.query(TopicEdge).filter(
-            TopicEdge.brainstorm_id == brainstorm_id,
-            TopicEdge.relationship == "connection_link",
-            (TopicEdge.source_topic_id == topic_id) | (TopicEdge.target_topic_id == topic_id),
-        ).all()
+    map_service.delete_topic(db, brainstorm_id, topic)
 
-        linked_topic_ids = []
-        for edge in connection_edges:
-            other_id = edge.target_topic_id if edge.source_topic_id == topic_id else edge.source_topic_id
-            linked_topic_ids.append(other_id)
-
-        # Recreate direct edge between the two bridged topics
-        if len(linked_topic_ids) == 2:
-            existing = db.query(TopicEdge).filter(
-                TopicEdge.brainstorm_id == brainstorm_id,
-                ((TopicEdge.source_topic_id == linked_topic_ids[0]) & (TopicEdge.target_topic_id == linked_topic_ids[1]))
-                | ((TopicEdge.source_topic_id == linked_topic_ids[1]) & (TopicEdge.target_topic_id == linked_topic_ids[0])),
-            ).first()
-            if not existing:
-                topic_service.create_edge(
-                    db, brainstorm_id,
-                    source_topic_id=linked_topic_ids[0],
-                    target_topic_id=linked_topic_ids[1],
-                    relationship="related",
-                    weight=0.5,
-                    commit=False,
-                )
-
-    # Delete associated edges first
-    db.query(TopicEdge).filter(
-        (TopicEdge.source_topic_id == topic_id) | (TopicEdge.target_topic_id == topic_id)
-    ).delete(synchronize_session=False)
-    db.delete(topic)
-    db.commit()
-
-    # Refresh suggestions now that this topic is gone
-    rebuild_map_suggestions(db, brainstorm_id)
+    publish_brainstorm_event("topic_deleted", brainstorm_id, {"topic_id": str(topic_id)})
     return None
 
 
@@ -259,7 +228,7 @@ def create_topic_manual(
 
         # Generate enriched library content via LLM
         try:
-            conv_text = _get_brainstorm_conversation_text(db, brainstorm_id)
+            conv_text = map_service.get_conversation_text(db, brainstorm_id)
             enriched = generate_library_content(
                 topic_name=topic_name,
                 conversation_text=conv_text if conv_text.strip() else topic_name,
@@ -270,6 +239,7 @@ def create_topic_manual(
                 conversation_text=conv_text,
             )
             if taxonomy:
+                topic.taxonomy = taxonomy
                 from app.tasks.classification_tasks import _taxonomy_to_markdown
                 taxonomy_md = _taxonomy_to_markdown(taxonomy)
                 if taxonomy_md:
@@ -282,9 +252,11 @@ def create_topic_manual(
                 folder_name=topic_name,
                 file_name=file_name,
                 content=enriched,
+                source_type="create",
             )
             topic.library_path = entry.file_path
             db.commit()
+            invalidate_map_cache(brainstorm_id)
             db.refresh(topic)
         except Exception:
             pass  # Library entry is best-effort
@@ -292,6 +264,7 @@ def create_topic_manual(
         # Refresh suggestions
         rebuild_map_suggestions(db, brainstorm_id)
 
+    publish_brainstorm_event("topic_created", brainstorm_id, {"topic_id": str(topic.id)})
     return topic
 
 
@@ -312,7 +285,7 @@ def explore_topic(
         raise HTTPException(status_code=404, detail="Topic not found")
 
     # Generate structured library content via LLM
-    conv_text = _get_brainstorm_conversation_text(db, brainstorm_id)
+    conv_text = map_service.get_conversation_text(db, brainstorm_id)
     enriched_content = generate_library_content(
         topic_name=topic.name,
         conversation_text=conv_text,
@@ -325,6 +298,7 @@ def explore_topic(
         conversation_text=conv_text,
     )
     if taxonomy:
+        topic.taxonomy = taxonomy
         from app.tasks.classification_tasks import _taxonomy_to_markdown
         taxonomy_md = _taxonomy_to_markdown(taxonomy)
         if taxonomy_md:
@@ -337,15 +311,17 @@ def explore_topic(
         folder_name=topic.name,
         file_name=file_name,
         content=enriched_content,
+        source_type="explore",
     )
     topic.library_path = entry.file_path
     topic.confidence = max(topic.confidence or 0.0, 0.7)
     db.commit()
+    invalidate_map_cache(brainstorm_id)
     db.refresh(topic)
 
     # Rebuild suggestions
     rebuild_map_suggestions(db, brainstorm_id)
-    return _build_map_response(db, brainstorm_id)
+    return map_service.build_map_response(db, brainstorm_id)
 
 
 # ─── Topic Content Generation (streaming) ─────────────────────
@@ -390,6 +366,63 @@ Structure your response as follows:
 
 Use markdown formatting throughout. Be thorough, accurate, and engaging.
 Do not include any preamble or meta-commentary — start directly with the summary line."""
+
+
+def _persist_generated_content(
+    db: Session,
+    brainstorm_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    topic_name: str,
+    full_response: str,
+) -> dict:
+    """Persist generated content to DB. Called via run_in_db from async context."""
+    # Parse summary: first line starting with "> " is the summary
+    lines = full_response.split("\n")
+    summary = ""
+    if lines and lines[0].startswith("> "):
+        summary = lines[0][2:].strip()
+
+    # Reload topic in the fresh session — must exist before we can create
+    # a library entry that references it (FK constraint).
+    topic = topic_service.get_topic(db, topic_id)
+    if topic is None:
+        raise RuntimeError(
+            f"Topic {topic_id} not found in database — it may have been "
+            "deleted between content generation and persistence."
+        )
+
+    if summary:
+        topic.description = summary
+    topic.outline = None
+    topic.confidence = max(topic.confidence or 0.0, 0.8)
+
+    # Create library entry
+    folder_name = topic_name
+    file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
+    entry = create_library_entry(
+        db, brainstorm_id,
+        topic_id=topic_id,
+        folder_name=folder_name,
+        file_name=file_name,
+        content=full_response.strip(),
+        source_type="generate",
+    )
+    topic.library_path = entry.file_path
+
+    db.commit()
+    invalidate_map_cache(brainstorm_id)
+
+    # Rebuild suggestions
+    rebuild_map_suggestions(db, brainstorm_id, commit=True)
+
+    # Publish WebSocket event
+    publish_brainstorm_event(
+        "topic_generated",
+        brainstorm_id,
+        {"topic_id": str(topic_id), "library_entry_id": str(entry.id)},
+    )
+
+    return {"topic_id": str(topic_id), "summary": summary}
 
 
 @router.post("/{brainstorm_id}/topics/{topic_id}/generate")
@@ -461,64 +494,21 @@ def generate_topic_content(
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
 
-        # Persist results in a fresh session
-        persist_db = SessionLocal()
+        if not full_response.strip():
+            yield f"data: {json.dumps({'done': True, 'error': 'Empty response from model'})}\n\n"
+            return
+
+        # Persist via thread-pool executor (avoids blocking the event loop)
         try:
-            if not full_response.strip():
-                yield f"data: {json.dumps({'done': True, 'error': 'Empty response from model'})}\n\n"
-                return
-
-            # Parse summary: first line starting with "> " is the summary
-            lines = full_response.split("\n")
-            summary = ""
-            if lines and lines[0].startswith("> "):
-                summary = lines[0][2:].strip()
-
-            # Reload topic in the persist session
-            persist_topic = persist_db.query(Topic).filter(Topic.id == topic_id).first()
-            if persist_topic:
-                if summary:
-                    persist_topic.description = summary
-                persist_topic.outline = None
-                persist_topic.confidence = max(persist_topic.confidence or 0.0, 0.8)
-
-            # Create library entry
-            folder_name = topic.name
-            file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-            entry = create_library_entry(
-                persist_db, brainstorm_id,
-                topic_id=topic_id,
-                folder_name=folder_name,
-                file_name=file_name,
-                content=full_response.strip(),
+            result = await run_in_db(
+                lambda db: _persist_generated_content(
+                    db, brainstorm_id, topic_id, topic.name, full_response,
+                )
             )
-            if persist_topic:
-                persist_topic.library_path = entry.file_path
-
-            persist_db.commit()
-
-            # Rebuild suggestions so the card shows proposition pills
-            from app.services.map_suggestion_service import rebuild_map_suggestions
-            rebuild_map_suggestions(persist_db, brainstorm_id, commit=True)
-
-            # Publish WebSocket event so frontend reloads library
-            from app.services.realtime_service import publish_brainstorm_event
-            publish_brainstorm_event(
-                "topic_generated",
-                brainstorm_id,
-                {
-                    "topic_id": str(topic_id),
-                    "library_entry_id": str(entry.id),
-                },
-            )
-
-            yield f"data: {json.dumps({'done': True, 'topic_id': str(topic_id), 'summary': summary})}\n\n"
-
+            yield f"data: {json.dumps({'done': True, **result})}\n\n"
         except Exception as e:
             logger.error("Failed to persist generated content for topic %s: %s", topic_id, e)
             yield f"data: {json.dumps({'error': f'Failed to save content: {e}'})}\n\n"
-        finally:
-            persist_db.close()
 
     return StreamingResponse(
         event_stream(),
@@ -536,30 +526,12 @@ def generate_topic_content(
 
 # ─── Edge Connection Exploration ──────────────────────────────
 
-CONNECTION_PROMPT = """You are a knowledgeable researcher. Explain how "{topic_a}" and "{topic_b}" are connected.
-
-Structure your response as follows:
-
-> A single-line summary of the connection between {topic_a} and {topic_b}.
-
-## How They Connect
-2-3 paragraphs explaining the relationship between these two topics. Cover:
-- How they relate to or depend on each other
-- Key similarities and differences
-- Historical or conceptual links
-- How one influences or enables the other
-
-## Key Intersections
-- **Intersection point**: Brief explanation
-- **Intersection point**: Brief explanation
-(2-3 entries)
-
-## Related Topics
-- topic-name-slug - How this broader topic relates to the connection
-- another-topic-slug - Another related field
-(1-2 entries)
-
-Use markdown formatting. Be thorough and accurate. Start directly with the summary line."""
+# Prompt is defined in app.tasks.research_tasks (shared with Celery task)
+from app.tasks.research_tasks import (
+    process_connection_exploration,
+    process_connection_exploration_sync,
+    CONNECTION_PROMPT,
+)
 
 
 class ExploreConnectionRequest(BaseModel):
@@ -569,7 +541,7 @@ class ExploreConnectionRequest(BaseModel):
     position_y: float = 0.0
 
 
-@router.post("/{brainstorm_id}/explore-connection", response_model=TopicResponse, status_code=201)
+@router.post("/{brainstorm_id}/explore-connection", status_code=202)
 def explore_connection(
     brainstorm_id: uuid.UUID,
     data: ExploreConnectionRequest,
@@ -578,9 +550,11 @@ def explore_connection(
 ):
     """Create a topic explaining how two existing topics are connected.
 
-    Creates a new topic card positioned between the two topics,
-    generates AI content explaining their relationship, and
-    links the new topic to both source and target via edges.
+    Dispatches the LLM call and topic creation to a Celery task and
+    returns 202 Accepted immediately. Results are published via
+    WebSocket (topic_generated event) when ready.
+
+    Falls back to synchronous execution if Celery/Redis is unavailable.
     """
     brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
     if not brainstorm:
@@ -593,96 +567,57 @@ def explore_connection(
     if not target or target.brainstorm_id != brainstorm_id:
         raise HTTPException(status_code=404, detail="Target topic not found")
 
-    source_display = source.name.replace("-", " ").title()
-    target_display = target.name.replace("-", " ").title()
+    # Check for duplicate connection topic (fast DB check, no LLM needed)
     connection_name = f"{source.name}-{target.name}-connection"
-
-    # Check for duplicate connection topic
     existing = topic_service.get_topic_by_name(db, brainstorm_id, connection_name, is_proposition=False)
     if existing:
         raise HTTPException(status_code=409, detail="A connection topic between these two already exists")
 
-    # Build prompt and generate content synchronously
-    prompt = CONNECTION_PROMPT.format(topic_a=source_display, topic_b=target_display)
-    model = brainstorm.model
-    api_key, base_url = resolve_credentials(db, model)
-
+    # Dispatch to Celery — returns immediately, results via WebSocket
     try:
-        raw = chat_with_model_sync([{"role": "user", "content": prompt}], model=model, api_key=api_key, base_url=base_url)
+        process_connection_exploration.delay(
+            str(brainstorm_id),
+            str(data.source_topic_id),
+            str(data.target_topic_id),
+            data.position_x,
+            data.position_y,
+        )
+        logger.info(
+            "connection_exploration dispatched | brainstorm=%s source=%s target=%s",
+            brainstorm_id, source.name, target.name,
+        )
     except Exception as e:
-        logger.error("Connection generation failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Failed to generate connection content: {e}")
+        logger.warning("Celery dispatch failed, running connection exploration synchronously: %s", e)
+        try:
+            result = process_connection_exploration_sync(
+                str(brainstorm_id),
+                str(data.source_topic_id),
+                str(data.target_topic_id),
+                data.position_x,
+                data.position_y,
+            )
+            if result.get("status") == "error":
+                raise HTTPException(
+                    status_code=500,
+                    detail=result.get("error", "Connection exploration failed"),
+                )
+        except HTTPException:
+            raise
+        except Exception as sync_e:
+            logger.error("Synchronous connection exploration also failed: %s", sync_e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate connection content: {sync_e}",
+            )
 
-    # Parse summary (first line starting with "> ")
-    lines = raw.split("\n")
-    summary = ""
-    if lines and lines[0].startswith("> "):
-        summary = lines[0][2:].strip()
-
-    # Create the connection topic
-    connection = topic_service.create_topic(
-        db, brainstorm_id,
-        name=connection_name,
-        description=summary or f"Connection between {source_display} and {target_display}",
-        is_proposition=False,
-        confidence=0.7,
-        outline=None,
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "processing",
+            "source_topic_id": str(data.source_topic_id),
+            "target_topic_id": str(data.target_topic_id),
+        },
     )
-
-    # Position between the two topics
-    connection.position_x = data.position_x
-    connection.position_y = data.position_y
-
-    # Create library entry
-    file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-    entry = create_library_entry(
-        db, brainstorm_id,
-        topic_id=connection.id,
-        folder_name=connection_name,
-        file_name=file_name,
-        content=raw.strip(),
-    )
-    connection.library_path = entry.file_path
-
-    # Create edges from connection to both source and target (fixed, non-removable)
-    topic_service.create_edge(
-        db, brainstorm_id,
-        source_topic_id=connection.id,
-        target_topic_id=source.id,
-        relationship="connection_link",
-        weight=0.5,
-    )
-    topic_service.create_edge(
-        db, brainstorm_id,
-        source_topic_id=connection.id,
-        target_topic_id=target.id,
-        relationship="connection_link",
-        weight=0.5,
-    )
-
-    # Remove the original direct edge between source and target —
-    # they're now linked through the connection card instead.
-    db.query(TopicEdge).filter(
-        TopicEdge.brainstorm_id == brainstorm_id,
-        ((TopicEdge.source_topic_id == source.id) & (TopicEdge.target_topic_id == target.id))
-        | ((TopicEdge.source_topic_id == target.id) & (TopicEdge.target_topic_id == source.id)),
-    ).delete(synchronize_session=False)
-
-    db.commit()
-    db.refresh(connection)
-
-    # Rebuild suggestions
-    rebuild_map_suggestions(db, brainstorm_id)
-
-    # Notify frontend
-    from app.services.realtime_service import publish_brainstorm_event
-    publish_brainstorm_event(
-        "topic_generated",
-        brainstorm_id,
-        {"topic_id": str(connection.id), "library_entry_id": str(entry.id)},
-    )
-
-    return connection
 
 
 # ─── Edge CRUD ─────────────────────────────────────────────────
@@ -705,11 +640,11 @@ def create_edge_manual(
     if not target or target.brainstorm_id != brainstorm_id:
         raise HTTPException(status_code=404, detail="Target topic not found")
 
-    existing = db.query(TopicEdge).filter(
-        TopicEdge.brainstorm_id == brainstorm_id,
-        TopicEdge.source_topic_id == data.source_topic_id,
-        TopicEdge.target_topic_id == data.target_topic_id,
-    ).first()
+    existing = topic_service.get_edge_between(
+        db, brainstorm_id,
+        source_topic_id=data.source_topic_id,
+        target_topic_id=data.target_topic_id,
+    )
     if existing:
         raise HTTPException(status_code=409, detail="Edge already exists")
 
@@ -720,6 +655,12 @@ def create_edge_manual(
         relationship=data.relationship,
         weight=data.weight,
     )
+    invalidate_map_cache(brainstorm_id)
+    publish_brainstorm_event("edge_created", brainstorm_id, {
+        "edge_id": str(edge.id),
+        "source_topic_id": str(data.source_topic_id),
+        "target_topic_id": str(data.target_topic_id),
+    })
     return TopicEdgeResponse(
         id=edge.id,
         source_topic_id=edge.source_topic_id,
@@ -738,22 +679,86 @@ def delete_edge_manual(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    edge = db.query(TopicEdge).filter(
-        TopicEdge.id == edge_id,
-        TopicEdge.brainstorm_id == brainstorm_id,
-    ).first()
+    edge = map_service.delete_edge(db, brainstorm_id, edge_id)
     if not edge:
         raise HTTPException(status_code=404, detail="Edge not found")
-    db.delete(edge)
-    db.commit()
+    publish_brainstorm_event("edge_deleted", brainstorm_id, {"edge_id": str(edge_id)})
     return None
 
 
-def _get_brainstorm_conversation_text(db: Session, brainstorm_id: uuid.UUID) -> str:
-    """Build conversation text from stored messages."""
-    messages, _ = message_service.get_messages(db, brainstorm_id, limit=200)
-    parts = []
-    for msg in messages:
-        role_label = "User" if msg.role.value == "user" else "Assistant"
-        parts.append(f"{role_label}: {msg.content}")
-    return "\n\n".join(parts)
+# ─── Topic Comments ──────────────────────────────────────────
+
+class CommentRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
+class CommentResponse(BaseModel):
+    id: uuid.UUID
+    topic_id: uuid.UUID
+    content: str
+    created_at: datetime
+
+
+@router.get("/{brainstorm_id}/topics/{topic_id}/comments", response_model=list[CommentResponse])
+def get_topic_comments(
+    brainstorm_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all comments on a topic, ordered by creation time."""
+    brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
+    if not brainstorm:
+        raise HTTPException(status_code=404, detail="Brainstorm not found")
+
+    topic = topic_service.get_topic(db, topic_id)
+    if not topic or topic.brainstorm_id != brainstorm_id:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    comments = map_service.get_topic_comments(db, topic_id)
+
+    return [
+        CommentResponse(
+            id=c.id,
+            topic_id=topic_id,
+            content=c.content,
+            created_at=c.created_at,
+        )
+        for c in comments
+    ]
+
+
+@router.post("/{brainstorm_id}/topics/{topic_id}/comments", response_model=CommentResponse, status_code=201)
+def add_topic_comment(
+    brainstorm_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    data: CommentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add a comment to a topic."""
+    brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
+    if not brainstorm:
+        raise HTTPException(status_code=404, detail="Brainstorm not found")
+
+    topic = topic_service.get_topic(db, topic_id)
+    if not topic or topic.brainstorm_id != brainstorm_id:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    msg = Message(
+        id=uuid.uuid4(),
+        brainstorm_id=brainstorm_id,
+        topic_id=topic_id,
+        role="user",
+        content=data.content,
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    return CommentResponse(
+        id=msg.id,
+        topic_id=topic_id,
+        content=msg.content,
+        created_at=msg.created_at,
+    )

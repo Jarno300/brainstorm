@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Route
-from app.api import brainstorms, chat, map, library, realtime, models, health, settings, export, auth, share, search, upload, research
+from app.api import brainstorms, chat, map, library, realtime, models, health, settings, export, auth, share, search, upload, research, organizations, api_keys, flashcards
 from app.config import (
     APP_TITLE, APP_DESCRIPTION, APP_VERSION, CORS_ORIGINS, validate_config,
 )
@@ -222,6 +222,9 @@ _routers = [
     search.router,
     upload.router,
     research.router,
+    organizations.router,
+    api_keys.router,
+    flashcards.router,
 ]
 
 for r in _routers:

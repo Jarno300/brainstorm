@@ -9,6 +9,19 @@ class OutlineSection(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
 
 
+class TaxonomyItem(BaseModel):
+    """A single taxonomy entry (parent/child/related topic)."""
+    name: str
+    description: str = ""
+
+
+class TopicTaxonomy(BaseModel):
+    """Structured taxonomy stored on a topic."""
+    parent_topics: List[TaxonomyItem] = []
+    child_topics: List[TaxonomyItem] = []
+    related_topics: List[TaxonomyItem] = []
+
+
 class TopicResponse(BaseModel):
     id: uuid.UUID
     brainstorm_id: uuid.UUID
@@ -21,6 +34,7 @@ class TopicResponse(BaseModel):
     position_x: float = 0.0
     position_y: float = 0.0
     outline: Optional[List[OutlineSection]] = None
+    taxonomy: Optional[TopicTaxonomy] = None
 
     class Config:
         from_attributes = True

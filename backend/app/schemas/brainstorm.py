@@ -6,7 +6,7 @@ import uuid
 
 class BrainstormCreate(BaseModel):
     title: Optional[str] = "New Brainstorm"
-    model: Optional[str] = "deepseek/deepseek-chat"
+    model: Optional[str] = None  # Falls back to DEFAULT_MODEL in the service layer
 
 
 class BrainstormTitleUpdate(BaseModel):

@@ -10,7 +10,7 @@ import uuid
 import re
 from datetime import datetime, timezone
 from app.tasks.celery_app import celery_app
-from app.database import SessionLocal
+from app.database import task_session
 from app.models.message import Message
 from app.services.classification_service import extract_topics
 from app.services.topic_service import (
@@ -206,6 +206,7 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
         conversation_text=conversation_text,
     )
     if taxonomy:
+        promoted_topic.taxonomy = taxonomy
         taxonomy_md = _taxonomy_to_markdown(taxonomy)
         if taxonomy_md:
             enriched_content += "\n\n" + taxonomy_md
@@ -219,6 +220,7 @@ def promote_clicked_suggestion(db, brainstorm_id: uuid.UUID, messages, conversat
         file_name=file_name,
         content=enriched_content,
         commit=False,
+        source_type="classification",
     )
 
     promoted_topic.library_path = entry.file_path
@@ -288,13 +290,14 @@ def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, co
                 conversation_text=conversation_text,
             )
 
-            # Append taxonomy sections so rebuild_map_suggestions can parse them
+            # Generate taxonomy and store it directly on the topic (no markdown roundtrip)
             taxonomy = generate_topic_taxonomy(
                 topic_name=name,
                 library_content=enriched,
                 conversation_text=conversation_text,
             )
             if taxonomy:
+                topic.taxonomy = taxonomy
                 taxonomy_md = _taxonomy_to_markdown(taxonomy)
                 if taxonomy_md:
                     enriched += "\n\n" + taxonomy_md
@@ -308,8 +311,8 @@ def create_topics_from_classification(db, brainstorm_id: uuid.UUID, messages, co
                 file_name=file_name,
                 content=enriched,
                 commit=False,
+                source_type="classification",
             )
-            topic.library_path = entry.file_path
 
         created_topics.append({
             "id": str(topic.id),
@@ -403,10 +406,11 @@ def process_message_classification(self, brainstorm_id_str: str):
     Publishes classification_complete or classification_error via Redis PubSub.
     """
     brainstorm_id = uuid.UUID(brainstorm_id_str)
-    db = SessionLocal()
 
     try:
-        result = _process_message_classification(db, brainstorm_id)
+        with task_session() as db:
+            result = _process_message_classification(db, brainstorm_id)
+
         from app.services.realtime_service import publish_brainstorm_event
 
         # Even "no_topics_found" is a valid outcome — not an error.
@@ -451,18 +455,18 @@ def process_message_classification(self, brainstorm_id_str: str):
             raise self.retry(exc=e, countdown=30)
 
         return {"status": "error", "error": error_msg}
-    finally:
-        db.close()
 
 
 def process_message_classification_sync(brainstorm_id_str: str, db=None):
-    """Synchronously run message classification for immediate UI updates."""
-    brainstorm_id = uuid.UUID(brainstorm_id_str)
-    owns_db = db is None
-    session = db or SessionLocal()
+    """Synchronously run message classification for immediate UI updates.
 
-    try:
+    If db is provided, uses the caller's session (caller owns lifecycle).
+    Otherwise creates a new session via task_session().
+    """
+    brainstorm_id = uuid.UUID(brainstorm_id_str)
+
+    if db is not None:
+        return _process_message_classification(db, brainstorm_id)
+
+    with task_session() as session:
         return _process_message_classification(session, brainstorm_id)
-    finally:
-        if owns_db:
-            session.close()

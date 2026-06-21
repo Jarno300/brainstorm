@@ -25,12 +25,13 @@ UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./uploads"))
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 ALLOWED_EXTENSIONS = {
     ".txt", ".md", ".csv", ".json",
-    ".pdf",
+    ".pdf", ".docx",
     ".png", ".jpg", ".jpeg", ".gif", ".webp",
 }
 ALLOWED_MIMETYPES = {
     "text/plain", "text/markdown", "text/csv", "application/json",
     "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "image/png", "image/jpeg", "image/gif", "image/webp",
 }
 
@@ -63,6 +64,46 @@ def _extract_image_description(file_bytes: bytes, filename: str) -> str:
     return f"[Image: {filename}]"
 
 
+def _extract_docx_text(file_bytes: bytes) -> str:
+    """Extract text from a DOCX file with heading structure preserved."""
+    try:
+        from docx import Document
+        doc = Document(io.BytesIO(file_bytes))
+        paragraphs = []
+        for para in doc.paragraphs:
+            text = para.text.strip()
+            if not text:
+                paragraphs.append("")
+                continue
+            # Preserve heading levels as markdown
+            if para.style and para.style.name:
+                style_name = para.style.name.lower()
+                if style_name.startswith("heading"):
+                    level = 1
+                    try:
+                        level = int(style_name.replace("heading", "").strip())
+                    except ValueError:
+                        level = 1
+                    level = min(level, 4)  # cap at h4
+                    paragraphs.append(f"{'#' * level} {text}")
+                    continue
+            paragraphs.append(text)
+        # Also extract tables
+        for table in doc.tables:
+            rows = []
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells]
+                rows.append(" | ".join(cells))
+            if rows:
+                paragraphs.append("")
+                paragraphs.extend(rows)
+                paragraphs.append("")
+        return "\n".join(paragraphs)
+    except Exception as e:
+        logger.warning("DOCX text extraction failed: %s", e)
+        return "[DOCX text extraction failed]"
+
+
 def extract_text(file_bytes: bytes, filename: str, content_type: str) -> str:
     """Extract text content from an uploaded file.
 
@@ -81,6 +122,10 @@ def extract_text(file_bytes: bytes, filename: str, content_type: str) -> str:
     # PDF
     if ext == ".pdf":
         return _extract_pdf_text(file_bytes)
+
+    # DOCX
+    if ext == ".docx":
+        return _extract_docx_text(file_bytes)
 
     # Images — placeholder for now (vision support requires multimodal models)
     if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
@@ -153,6 +198,8 @@ def save_upload(
             file_name=file.filename or "upload",
             content=extracted,
             commit=True,
+            source_type="upload",
+            source_id=str(file_id),
         )
     except Exception as lib_err:
         logger.warning("Failed to create library entry for upload: %s", lib_err)

@@ -1,11 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, lazy, Suspense } from 'react';
 import {
     Box,
     Typography,
-    List,
-    ListItemButton,
-    ListItemText,
-    ListItemIcon,
     IconButton,
     Button,
     alpha,
@@ -15,22 +11,29 @@ import {
 } from '@mui/material';
 import {
     Add as AddIcon,
-    Chat as ChatIcon,
     DarkMode as DarkModeIcon,
     LightMode as LightModeIcon,
     Psychology as BrainIcon,
-    Delete as DeleteIcon,
-    Edit as EditIcon,
     MenuOpen as CollapseIcon,
     ChevronRight as ExpandIcon,
     Search as SearchIcon,
+    Share as ShareIcon,
 } from '@mui/icons-material';
-import { updateBrainstormTitle } from '../api';
+import ThemeSwitcher from '../features/settings/ThemeSwitcher';
+import ModelSwitcher from '../features/settings/ModelSwitcher';
+import BrainstormList from '../features/brainstorm/BrainstormList';
+import useBrainstormStore from '../stores/brainstormStore';
 
-function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mode, onToggleTheme, collapsed, onToggleCollapse, onRenameComplete }) {
+const AddModelModal = lazy(() => import('../features/settings/AddModelModal'));
+const ShareDialog = lazy(() => import('../features/share/ShareDialog'));
+
+function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mode, onToggleTheme, collapsed, onToggleCollapse, onRenameComplete, themeId, onThemeChange, onModelChange }) {
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [addModelOpen, setAddModelOpen] = useState(false);
+    const [shareOpen, setShareOpen] = useState(false);
+    const [refreshModels, setRefreshModels] = useState(null);
     const editingRef = useRef(null);
 
     const filteredBrainstorms = brainstorms.filter((b) =>
@@ -50,7 +53,7 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
             return;
         }
         try {
-            await updateBrainstormTitle(editingId, editTitle.trim());
+            await useBrainstormStore.getState().updateTitle(editingId, editTitle.trim());
             setEditingId(null);
             onRenameComplete?.();
         } catch (err) {
@@ -119,6 +122,20 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                         <AddIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                 </Tooltip>
+                {/* ── Model chip (compact) ────────────────── */}
+                {activeBrainstorm && (
+                    <Chip
+                        label={activeBrainstorm.model}
+                        size="small"
+                        sx={(theme) => ({
+                            height: 20, fontSize: '0.55rem', fontWeight: 700, borderRadius: '6px',
+                            bgcolor: alpha(theme.palette.primary.main, 0.12),
+                            color: theme.palette.primary.light,
+                            border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.15),
+                            '& .MuiChip-label': { px: 0.75 },
+                        })}
+                    />
+                )}
                 <Tooltip title="Expand sidebar" arrow placement="right">
                     <IconButton
                         onClick={onToggleCollapse}
@@ -138,6 +155,14 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                         <ExpandIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                 </Tooltip>
+                <ThemeSwitcher themeId={themeId} onThemeChange={onThemeChange} />
+                {activeBrainstorm && (
+                    <ModelSwitcher
+                        currentModel={activeBrainstorm.model || ''}
+                        onModelChange={onModelChange}
+                        onAddModel={() => setAddModelOpen(true)}
+                    />
+                )}
                 <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'} arrow placement="right">
                     <IconButton
                         onClick={onToggleTheme}
@@ -156,6 +181,13 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
                         {mode === 'dark' ? <LightModeIcon sx={{ fontSize: 16 }} /> : <DarkModeIcon sx={{ fontSize: 16 }} />}
                     </IconButton>
                 </Tooltip>
+
+                <Suspense fallback={null}>
+                    {addModelOpen && <AddModelModal open={addModelOpen} onClose={() => setAddModelOpen(false)} />}
+                </Suspense>
+                <Suspense fallback={null}>
+                    {shareOpen && <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} brainstormId={activeBrainstorm?.id} />}
+                </Suspense>
             </Box>
         );
     }
@@ -163,13 +195,18 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
     return (
         <Box
             sx={(theme) => ({
-                width: 280,
-                minWidth: 280,
+                width: { xs: '100vw', md: 280 },
+                minWidth: { xs: '100vw', md: 280 },
+                maxWidth: { xs: '100vw', md: 280 },
                 height: '100vh',
                 display: 'flex',
                 flexDirection: 'column',
                 bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.75) : alpha(theme.palette.background.paper, 0.4),
                 transition: 'all 0.2s ease',
+                position: { xs: 'fixed', md: 'relative' },
+                zIndex: { xs: 20, md: 1 },
+                left: 0,
+                top: 0,
                 position: 'relative',
                 zIndex: 10,
             })}
@@ -376,227 +413,75 @@ function Sidebar({ brainstorms, activeBrainstorm, onNew, onSelect, onDelete, mod
             </Tooltip>
 
             {/* ── Brainstorm List ─────────────────────────────── */}
-            <List sx={{ flex: 1, overflow: 'auto', px: 1.5, pb: 2, '& > :last-child': { mb: 0 } }}>
-                {filteredBrainstorms.length === 0 ? (
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            py: 6,
-                            px: 2,
-                            gap: 1.5,
-                        }}
-                    >
-                        <BrainIcon
+            <BrainstormList
+                brainstorms={filteredBrainstorms}
+                activeBrainstorm={activeBrainstorm}
+                onSelect={onSelect}
+                onDelete={onDelete}
+                editingId={editingId}
+                editTitle={editTitle}
+                editingRef={editingRef}
+                onStartEdit={handleStartRename}
+                onEditTitleChange={(e) => setEditTitle(e.target.value)}
+                onEditKeyDown={handleRenameKeyDown}
+                onSaveEdit={handleSaveRename}
+                searchQuery={searchQuery}
+            />
+
+            {/* ── Bottom toolbar ─────────────────────────── */}
+            {activeBrainstorm && (
+                <Box sx={(theme) => ({
+                    px: 2, py: 1.5,
+                    borderTop: '1px solid',
+                    borderColor: alpha(theme.palette.divider, 0.1),
+                    display: 'flex', flexDirection: 'column', gap: 1,
+                    bgcolor: alpha(theme.palette.background.paper, 0.3),
+                })}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                            label={activeBrainstorm.model}
+                            size="small"
                             sx={(theme) => ({
-                                fontSize: 36,
-                                color: alpha(theme.palette.text.disabled, 0.4),
-                                opacity: 0.5,
+                                height: 24, fontSize: '0.7rem', fontWeight: 700, borderRadius: '6px',
+                                bgcolor: alpha(theme.palette.primary.main, 0.12),
+                                color: theme.palette.primary.light,
+                                border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.15),
+                                '& .MuiChip-label': { px: 1 },
                             })}
-                            className="empty-state-icon"
                         />
-                        <Typography
-                            variant="body2"
-                            sx={(theme) => ({ color: alpha(theme.palette.text.secondary, 0.6), textAlign: 'center', lineHeight: 1.5 })}
-                        >
-                            {searchQuery ? 'No matching sessions.' : 'No brainstorms yet.\nEnter a topic above and explore.'}
-                        </Typography>
-                    </Box>
-                ) : (
-                    filteredBrainstorms.map((b) => (
-                        <ListItemWrapper
-                            key={b.id}
-                            brainstorm={b}
-                            isActive={activeBrainstorm?.id === b.id}
-                            editingId={editingId}
-                            editTitle={editTitle}
-                            editingRef={editingRef}
-                            onSelect={() => onSelect(b)}
-                            onStartEdit={(e) => handleStartRename(e, b)}
-                            onEditTitleChange={(e) => setEditTitle(e.target.value)}
-                            onEditKeyDown={handleRenameKeyDown}
-                            onSaveEdit={handleSaveRename}
-                            onDelete={(e) => {
-                                e.stopPropagation();
-                                onDelete(b);
-                            }}
-                        />
-                    ))
-                )}
-            </List>
-        </Box>
-    );
-}
-
-function ListItemWrapper({ brainstorm: b, isActive, onSelect, onStartEdit, onDelete, editingId, editTitle, editingRef, onEditTitleChange, onEditKeyDown, onSaveEdit }) {
-    const isEditing = editingId === b.id;
-
-    return (
-        <Box
-            sx={{
-                position: 'relative',
-                mb: 0.5,
-                borderRadius: 2,
-                '&:hover .brainstorm-actions': { opacity: 1 },
-            }}
-        >
-            <ListItemButton
-                selected={isActive}
-                onClick={isEditing ? undefined : onSelect}
-                sx={(theme) => ({
-                    borderRadius: 2,
-                    py: 1.2,
-                    px: 1.5,
-                    pr: 5.5,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&::before': isActive ? {
-                        content: '""',
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 3,
-                        borderRadius: '0 2px 2px 0',
-                        bgcolor: 'primary.main',
-                        boxShadow: (theme) => `0 0 10px ${alpha(theme.palette.primary.main, 0.4)}`,
-                    } : {},
-                    '&.Mui-selected': {
-                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
-                        border: '1px solid',
-                        borderColor: (theme) => alpha(theme.palette.primary.main, 0.18),
-                        '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12) },
-                    },
-                    '&:hover': {
-                        bgcolor: (theme) => alpha(theme.palette.action.hover, 0.3),
-                    },
-                })}
-            >
-                <ListItemIcon sx={{ minWidth: 34 }}>
-                    <ChatIcon
-                        sx={(theme) => ({
-                            fontSize: 17,
-                            color: isActive ? theme.palette.primary.light : alpha(theme.palette.text.secondary, 0.5),
-                            transition: 'color 0.2s ease',
-                        })}
-                    />
-                </ListItemIcon>
-                {isEditing ? (
-                    <TextField
-                        inputRef={editingRef}
-                        fullWidth
-                        size="small"
-                        value={editTitle}
-                        onChange={onEditTitleChange}
-                        onKeyDown={onEditKeyDown}
-                        onBlur={onSaveEdit}
-                        onClick={(e) => e.stopPropagation()}
-                        variant="outlined"
-                        slotProps={{
-                            input: {
-                                sx: (theme) => ({
-                                    borderRadius: 1.5,
-                                    fontSize: '0.825rem',
-                                    fontWeight: 600,
-                                    color: theme.palette.text.primary,
-                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                    border: '1px solid',
-                                    borderColor: theme.palette.primary.main,
-                                    '& fieldset': { border: 'none' },
-                                    '& input': {
-                                        padding: '2px 8px !important',
-                                    },
-                                }),
-                            },
-                        }}
-                    />
-                ) : (
-                    <ListItemText
-                        primary={b.title}
-                        secondary={`${b.explored_topic_count ?? b.message_count ?? 0} explored topic${(b.explored_topic_count ?? b.message_count ?? 0) !== 1 ? 's' : ''}`}
-                        slotProps={{
-                            primary: {
-                                variant: 'body2',
-                                fontWeight: isActive ? 600 : 500,
-                                noWrap: true,
-                                sx: {
-                                    color: isActive ? 'text.primary' : 'text.secondary',
-                                    fontSize: '0.825rem',
-                                    lineHeight: 1.4,
+                        <IconButton
+                            size="small"
+                            onClick={() => setShareOpen(true)}
+                            sx={(t) => ({
+                                width: 28, height: 28, borderRadius: 1,
+                                color: alpha(t.palette.text.secondary, 0.5),
+                                ml: 'auto',
+                                '&:hover': {
+                                    bgcolor: alpha(t.palette.primary.main, 0.08),
+                                    color: t.palette.primary.light,
                                 },
-                            },
-                            secondary: {
-                                variant: 'caption',
-                                sx: (theme) => ({
-                                    color: alpha(theme.palette.text.secondary, 0.55),
-                                    fontSize: '0.7rem',
-                                    lineHeight: 1.3,
-                                    mt: 0.25,
-                                }),
-                            },
-                        }}
-                    />
-                )}
-            </ListItemButton>
-            {/* ── Action Buttons ──────────────────────────────── */}
-            <Box
-                className="brainstorm-actions"
-                sx={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    display: 'flex',
-                    gap: 0.25,
-                    opacity: 0,
-                    transition: 'opacity 0.15s ease',
-                }}
-            >
-                {!isEditing && (
-                    <>
-                        <Tooltip title="Rename" arrow>
-                            <IconButton
-                                size="small"
-                                onClick={onStartEdit}
-                                sx={(theme) => ({
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: 1,
-                                    color: alpha(theme.palette.text.secondary, 0.4),
-                                    '&:hover': {
-                                        color: theme.palette.primary.light,
-                                        bgcolor: alpha(theme.palette.primary.main, 0.15),
-                                    },
-                                })}
-                                aria-label={`Rename ${b.title}`}
-                            >
-                                <EditIcon sx={{ fontSize: 12 }} />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete" arrow>
-                            <IconButton
-                                size="small"
-                                onClick={onDelete}
-                                sx={(theme) => ({
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: 1,
-                                    color: alpha(theme.palette.text.secondary, 0.4),
-                                    '&:hover': {
-                                        color: theme.palette.error.main,
-                                        bgcolor: alpha(theme.palette.error.main, 0.15),
-                                    },
-                                })}
-                                aria-label={`Delete ${b.title}`}
-                            >
-                                <DeleteIcon sx={{ fontSize: 12 }} />
-                            </IconButton>
-                        </Tooltip>
-                    </>
-                )}
-            </Box>
+                            })}
+                        >
+                            <ShareIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <ModelSwitcher
+                            currentModel={activeBrainstorm?.model || ''}
+                            onModelChange={onModelChange}
+                            onAddModel={() => setAddModelOpen(true)}
+                        />
+                        <ThemeSwitcher themeId={themeId} onThemeChange={onThemeChange} />
+                    </Box>
+                </Box>
+            )}
+
+            <Suspense fallback={null}>
+                {addModelOpen && <AddModelModal open={addModelOpen} onClose={() => setAddModelOpen(false)} />}
+            </Suspense>
+            <Suspense fallback={null}>
+                {shareOpen && <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} brainstormId={activeBrainstorm?.id} />}
+            </Suspense>
         </Box>
     );
 }

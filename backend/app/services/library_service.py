@@ -13,6 +13,9 @@ def create_library_entry(
     file_name: str,
     content: str,
     commit: bool = True,
+    source_type: Optional[str] = None,
+    source_id: Optional[str] = None,
+    source_model: Optional[str] = None,
 ) -> LibraryEntry:
     """Create a library entry. Content stored in DB only — no filesystem I/O."""
     entry = LibraryEntry(
@@ -22,6 +25,9 @@ def create_library_entry(
         file_name=file_name,
         file_path="",          # DB-only; file_path kept for backward compatibility
         content=content,
+        source_type=source_type,
+        source_id=source_id,
+        source_model=source_model,
     )
     db.add(entry)
     if commit:

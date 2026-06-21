@@ -3,9 +3,10 @@ import { buildBrainstormWebSocketUrl } from '../api';
 import logger from '../utils/logger';
 
 const CLASSIFICATION_TIMEOUT_MS = 30_000;
+const CONNECTION_EXPLORE_TIMEOUT_MS = 60_000;
 
 export function useBrainstormWebSocket(activeBrainstorm, dependencies) {
-  const { loadMap, loadLibrary, loadList, setExploringTopic, setHasClassified } = dependencies;
+  const { loadMap, loadLibrary, loadList, setExploringTopic, setExploringEdge, setHasClassified } = dependencies;
 
   const wsRef = useRef(null);
   const classifiedTimerRef = useRef(null);
@@ -41,6 +42,12 @@ export function useBrainstormWebSocket(activeBrainstorm, dependencies) {
         if (msg.event === 'topic_generated') {
           loadMap(activeBrainstorm.id);
           loadLibrary(activeBrainstorm.id);
+          setExploringEdge?.(null);
+        }
+        if (msg.event === 'topic_created' || msg.event === 'topic_updated'
+            || msg.event === 'topic_deleted' || msg.event === 'edge_created'
+            || msg.event === 'edge_deleted') {
+          loadMap(activeBrainstorm.id);
         }
         if (msg.event === 'CONNECTED') {
           logger.debug('WebSocket connected:', msg.brainstorm_id);

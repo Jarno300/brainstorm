@@ -15,6 +15,9 @@ class LibraryEntry(Base):
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=True, default="")
     content = Column(Text, default="")
+    source_type = Column(String(50), nullable=True, default=None)  # 'chat', 'upload', 'research', 'explore', 'connection'
+    source_id = Column(String(255), nullable=True, default=None)   # message_id, file_id, etc.
+    source_model = Column(String(100), nullable=True, default=None)  # LLM model used
     created_at = Column(DateTime, default=utcnow, index=True)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

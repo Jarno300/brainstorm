@@ -1,12 +1,20 @@
 import uuid
 from typing import List, Optional
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from app.models.topic import Topic
 from app.models.topic_edge import TopicEdge
 
 
 def normalize_topic_name(name: str) -> str:
     return " ".join(str(name or "").lower().replace("-", " ").split())
+
+
+def _normalized_name_expr():
+    """SQL expression that normalizes topic.name the same way Python does."""
+    return func.lower(func.replace(Topic.name, "-", " "))
 
 
 def create_topic(
@@ -52,17 +60,21 @@ def get_topic_by_name(
     name: str,
     is_proposition: Optional[bool] = None,
 ) -> Optional[Topic]:
+    """Find a topic by normalized name using SQL-level comparison.
+
+    Avoids loading all topics into memory by pushing the normalization
+    to the database via func.lower / func.replace.
+    """
     normalized_name = normalize_topic_name(name)
-    query = db.query(Topic).filter(Topic.brainstorm_id == brainstorm_id)
+    query = db.query(Topic).filter(
+        Topic.brainstorm_id == brainstorm_id,
+        _normalized_name_expr() == normalized_name,
+    )
 
     if is_proposition is not None:
         query = query.filter(Topic.is_proposition == is_proposition)
 
-    for topic in query.all():
-        if normalize_topic_name(topic.name) == normalized_name:
-            return topic
-
-    return None
+    return query.first()
 
 
 def create_edge(
@@ -92,6 +104,20 @@ def create_edge(
 
 def get_edges(db: Session, brainstorm_id: uuid.UUID) -> List[TopicEdge]:
     return db.query(TopicEdge).filter(TopicEdge.brainstorm_id == brainstorm_id).all()
+
+
+def get_edge_between(
+    db: Session,
+    brainstorm_id: uuid.UUID,
+    source_topic_id: uuid.UUID,
+    target_topic_id: uuid.UUID,
+) -> Optional[TopicEdge]:
+    """Find an edge between two topics in either direction."""
+    return db.query(TopicEdge).filter(
+        TopicEdge.brainstorm_id == brainstorm_id,
+        TopicEdge.source_topic_id == source_topic_id,
+        TopicEdge.target_topic_id == target_topic_id,
+    ).first()
 
 
 def delete_propositions(db: Session, brainstorm_id: uuid.UUID, commit: bool = True):

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { streamSSE } from './sse';
 
 // The backend is exposed on localhost:8000 via Docker port mapping
 // or when running locally. Use VITE_API_URL env var to override.
@@ -26,6 +27,20 @@ const api = axios.create({
     },
 });
 
+// ── Global 401 handler — clears session on auth failure ───
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('brainstorm-auth-token');
+            localStorage.removeItem('brainstorm-auth-user');
+            delete api.defaults.headers.common['Authorization'];
+            window.location.reload();
+        }
+        return Promise.reject(error);
+    },
+);
+
 // Brainstorms
 export const listBrainstorms = () => api.get('/brainstorms/');
 export const createBrainstorm = (data) => api.post('/brainstorms/', data);
@@ -40,8 +55,6 @@ export const getMessages = (id, limit = 50, beforeId = null) => {
 };
 
 // Chat
-export const sendMessage = (data) => api.post('/chat/', data);
-
 /**
  * Stream a chat message via SSE and invoke callbacks for each event.
  *
@@ -53,92 +66,18 @@ export const sendMessage = (data) => api.post('/chat/', data);
  * @returns {AbortController} - call .abort() to cancel the stream
  */
 export function streamMessage(data, { onToken, onDone, onError }) {
-    const controller = new AbortController();
-    const url = `${API_BASE}/chat/stream`;
-    const token = localStorage.getItem('brainstorm-auth-token');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-        signal: controller.signal,
-    })
-        .then(async (response) => {
-            if (!response.ok) {
-                const text = await response.text().catch(() => 'Unknown error');
-                onError(`Server error ${response.status}: ${text}`);
-                return;
+    return streamSSE(`${API_BASE}/chat/stream`, data, {
+        onEvent(event) {
+            if (event.token) {
+                onToken(event.token);
+            } else if (event.done) {
+                onDone(event);
+            } else if (event.error) {
+                onError(event.error);
             }
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-
-                // Parse SSE frames: events are delimited by double-newline (\n\n).
-                // Each event may have multiple "data:" lines concatenated.
-                let idx;
-                while ((idx = buffer.indexOf('\n\n')) !== -1) {
-                    const frame = buffer.slice(0, idx);
-                    buffer = buffer.slice(idx + 2);
-
-                    // Collect all "data:" lines from this event
-                    const dataLines = [];
-                    for (const line of frame.split('\n')) {
-                        if (line.startsWith('data: ')) {
-                            dataLines.push(line.slice(6));
-                        }
-                    }
-                    const payload = dataLines.join('\n');
-                    if (!payload.trim()) continue;
-
-                    try {
-                        const event = JSON.parse(payload);
-                        if (event.token) {
-                            onToken(event.token);
-                        } else if (event.done) {
-                            onDone(event);
-                        } else if (event.error) {
-                            onError(event.error);
-                        }
-                    } catch {
-                        // skip parse errors on partial frames
-                    }
-                }
-            }
-
-            // Process any remaining buffer (incomplete final event)
-            if (buffer.trim()) {
-                const dataLines = [];
-                for (const line of buffer.split('\n')) {
-                    if (line.startsWith('data: ')) {
-                        dataLines.push(line.slice(6));
-                    }
-                }
-                const payload = dataLines.join('\n');
-                if (payload.trim()) {
-                    try {
-                        const event = JSON.parse(payload);
-                        if (event.done) onDone(event);
-                        else if (event.error) onError(event.error);
-                    } catch { /* ignore */ }
-                }
-            }
-        })
-        .catch((err) => {
-            if (err.name !== 'AbortError') {
-                onError(err.message || 'Network error');
-            }
-        });
-
-    return controller;
+        },
+        onError,
+    });
 }
 
 // Map
@@ -154,6 +93,13 @@ export const deleteEdge = (brainstormId, edgeId) => api.delete(`/map/${brainstor
 // Explore connection between two topics
 export const exploreConnection = (brainstormId, data) => api.post(`/map/${brainstormId}/explore-connection`, data);
 
+// Gap detection
+export const getGaps = (brainstormId) => api.get(`/map/${brainstormId}/gaps`);
+
+// Topic comments
+export const getTopicComments = (brainstormId, topicId) => api.get(`/map/${brainstormId}/topics/${topicId}/comments`);
+export const addTopicComment = (brainstormId, topicId, content) => api.post(`/map/${brainstormId}/topics/${topicId}/comments`, { content });
+
 /**
  * Stream AI-generated content for a topic's outline sections.
  *
@@ -166,91 +112,21 @@ export const exploreConnection = (brainstormId, data) => api.post(`/map/${brains
  * @returns {AbortController}
  */
 export function generateTopicContent(brainstormId, topicId, { onToken, onDone, onError }) {
-    const controller = new AbortController();
-    const url = `${API_BASE}/map/${brainstormId}/topics/${topicId}/generate`;
-    const token = localStorage.getItem('brainstorm-auth-token');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    fetch(url, {
-        method: 'POST',
-        headers,
-        signal: controller.signal,
-    })
-        .then(async (response) => {
-            if (!response.ok) {
-                const text = await response.text().catch(() => 'Unknown error');
-                onError(`Server error ${response.status}: ${text}`);
-                return;
+    return streamSSE(`${API_BASE}/map/${brainstormId}/topics/${topicId}/generate`, null, {
+        onEvent(event) {
+            if (event.token) {
+                onToken(event.token);
+            } else if (event.done) {
+                onDone(event);
+            } else if (event.error) {
+                onError(event.error);
             }
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-
-                let idx;
-                while ((idx = buffer.indexOf('\n\n')) !== -1) {
-                    const frame = buffer.slice(0, idx);
-                    buffer = buffer.slice(idx + 2);
-
-                    const dataLines = [];
-                    for (const line of frame.split('\n')) {
-                        if (line.startsWith('data: ')) {
-                            dataLines.push(line.slice(6));
-                        }
-                    }
-                    const payload = dataLines.join('\n');
-                    if (!payload.trim()) continue;
-
-                    try {
-                        const event = JSON.parse(payload);
-                        if (event.token) {
-                            onToken(event.token);
-                        } else if (event.done) {
-                            onDone(event);
-                        } else if (event.error) {
-                            onError(event.error);
-                        }
-                    } catch {
-                        // skip parse errors
-                    }
-                }
-            }
-
-            if (buffer.trim()) {
-                const dataLines = [];
-                for (const line of buffer.split('\n')) {
-                    if (line.startsWith('data: ')) {
-                        dataLines.push(line.slice(6));
-                    }
-                }
-                const payload = dataLines.join('\n');
-                if (payload.trim()) {
-                    try {
-                        const event = JSON.parse(payload);
-                        if (event.done) onDone(event);
-                        else if (event.error) onError(event.error);
-                    } catch { /* ignore */ }
-                }
-            }
-        })
-        .catch((err) => {
-            if (err.name !== 'AbortError') {
-                onError(err.message || 'Network error');
-            }
-        });
-
-    return controller;
+        },
+        onError,
+    });
 }
 
 // Provider settings
-export const getProviderSettings = (provider) => api.get(`/settings/${provider}`);
 export const updateProviderSettings = (provider, data) => api.put(`/settings/${provider}`, data);
 
 // Share
@@ -259,10 +135,11 @@ export const disableSharing = (id) => api.delete(`/brainstorms/${id}/share`);
 
 // Export
 export const exportMarkdown = (id) => api.get(`/brainstorms/${id}/export/markdown`, { responseType: 'blob' });
+export const exportOPML = (id) => api.get(`/brainstorms/${id}/export/opml`, { responseType: 'blob' });
+export const importBrainstorm = (id, data) => api.post(`/brainstorms/${id}/export/import`, data);
 
 // Library
 export const getLibrary = (id) => api.get(`/library/${id}`);
-export const getLibraryEntry = (id) => api.get(`/library/entry/${id}`);
 export const updateLibraryEntry = (id, content) => api.put(`/library/entry/${id}`, { content });
 export const deleteLibraryEntry = (id) => api.delete(`/library/entry/${id}`);
 
@@ -271,5 +148,42 @@ export const searchAll = (q, limit = 30) => api.get('/search/', { params: { q, l
 
 // Research
 export const researchTopic = (brainstormId, topic) => api.post(`/research/${brainstormId}`, { topic });
+
+// URL import
+export const importUrl = (brainstormId, url, topicId = null) => api.post(`/upload/${brainstormId}/url`, { url, topic_id: topicId });
+
+// Flashcards
+export const getFlashcards = (brainstormId) => api.get(`/map/${brainstormId}/flashcards`);
+export const getDueFlashcards = (brainstormId) => api.get(`/map/${brainstormId}/flashcards/due`);
+export const reviewFlashcard = (brainstormId, flashcardId, quality) => api.post(`/map/${brainstormId}/flashcards/${flashcardId}/review`, { quality });
+
+/**
+ * Stream AI-generated flashcards from the knowledge map via SSE.
+ *
+ * @param {string} brainstormId
+ * @param {object} callbacks
+ * @param {(token:string)=>void} callbacks.onToken - called per token
+ * @param {({count:number})=>void} callbacks.onDone - called on completion
+ * @param {(error:string)=>void} callbacks.onError - called on error
+ * @returns {AbortController}
+ */
+export function generateFlashcards(brainstormId, { onToken, onDone, onError }) {
+    return streamSSE(`${API_BASE}/map/${brainstormId}/flashcards/generate`, null, {
+        onEvent(event) {
+            if (event.token) {
+                onToken(event.token);
+            } else if (event.done) {
+                if (event.error) {
+                    onError(event.error);
+                } else {
+                    onDone(event);
+                }
+            } else if (event.error) {
+                onError(event.error);
+            }
+        },
+        onError,
+    });
+}
 
 export default api;

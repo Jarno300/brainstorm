@@ -1,26 +1,28 @@
 import { create } from 'zustand';
 
+const safeStorage = typeof localStorage !== 'undefined' ? localStorage : null;
+
 const useUIStore = create((set, get) => ({
   // Theme
-  mode: localStorage.getItem('brainstorm-theme') || 'light',
-  themeId: localStorage.getItem('brainstorm-theme-id') || 'auburn',
+  mode: safeStorage?.getItem('brainstorm-theme') || 'light',
+  themeId: safeStorage?.getItem('brainstorm-theme-id') || 'auburn',
 
   setMode: (mode) => {
-    localStorage.setItem('brainstorm-theme', mode);
+    safeStorage?.setItem('brainstorm-theme', mode);
     set({ mode });
   },
 
   setThemeId: (themeId) => {
-    localStorage.setItem('brainstorm-theme-id', themeId);
+    safeStorage?.setItem('brainstorm-theme-id', themeId);
     set({ themeId });
   },
 
   // Sidebar
-  sidebarCollapsed: localStorage.getItem('brainstorm-sidebar-collapsed') === 'true',
+  sidebarCollapsed: safeStorage?.getItem('brainstorm-sidebar-collapsed') === 'true',
 
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
-    localStorage.setItem('brainstorm-sidebar-collapsed', next);
+    safeStorage?.setItem('brainstorm-sidebar-collapsed', next);
     set({ sidebarCollapsed: next });
   },
 

@@ -30,6 +30,20 @@ def get_source_text_for_topic(db, topic) -> str:
     return topic.name.replace("-", " ")
 
 
+def _get_taxonomy_from_topic(topic) -> dict | None:
+    """Extract taxonomy (parent/child/related) from a topic's taxonomy JSONB column.
+
+    Returns None if taxonomy is not stored (e.g., topics created before this feature).
+    """
+    if not topic.taxonomy or not isinstance(topic.taxonomy, dict):
+        return None
+    tax = topic.taxonomy
+    # Validate required keys exist
+    if any(k in tax for k in ("parent_topics", "child_topics", "related_topics")):
+        return tax
+    return None
+
+
 # ─── Section extractors: parse ## Parent Topics / ## Child Topics / ## Related Topics ───
 
 def _extract_topic_bullets_from_section(source_text: str, section_name: str) -> list:
@@ -186,19 +200,25 @@ def rebuild_map_suggestions(db, brainstorm_id: uuid.UUID, commit: bool = True):
     created_suggestions = []
 
     for source_topic in main_topics:
-        source_text = get_source_text_for_topic(db, source_topic)
+        # Prefer taxonomy JSONB column (fast, structured) over markdown parsing
+        taxonomy = _get_taxonomy_from_topic(source_topic)
+        if taxonomy:
+            parent_proposals = taxonomy.get("parent_topics", [])
+            child_proposals = taxonomy.get("child_topics", [])
+            related_proposals = taxonomy.get("related_topics", [])
+        else:
+            # Fall back to regex parsing from markdown library entries
+            source_text = get_source_text_for_topic(db, source_topic)
+            parent_proposals = _extract_parent_topics_from_library_entry(source_text)
+            child_proposals = _extract_child_topics_from_library_entry(source_text)
+            related_proposals = _extract_related_topics_from_library_entry(source_text)
 
-        # Collect proposals from structured sections (parent, child, related)
-        parent_proposals = _extract_parent_topics_from_library_entry(source_text)
-        child_proposals = _extract_child_topics_from_library_entry(source_text)
-        related_proposals = _extract_related_topics_from_library_entry(source_text)
-
-        # If no structured sections found, fall back to regex extraction (related only)
-        all_structured = parent_proposals + child_proposals + related_proposals
-        if not all_structured:
-            fallback = _extract_concrete_topics_from_text(source_topic, source_text, existing_topic_names)
-            if fallback:
-                related_proposals = random.sample(fallback, k=min(3, len(fallback)))
+            # If no structured sections found, fall back to regex extraction
+            all_structured = parent_proposals + child_proposals + related_proposals
+            if not all_structured:
+                fallback = _extract_concrete_topics_from_text(source_topic, source_text, existing_topic_names)
+                if fallback:
+                    related_proposals = random.sample(fallback, k=min(3, len(fallback)))
 
         # Create proposition topics with suggestion edges
         all_proposals = [

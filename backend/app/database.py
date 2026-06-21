@@ -73,3 +73,49 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+from contextlib import contextmanager
+
+@contextmanager
+def task_session():
+    """Context manager for Celery task DB sessions.
+
+    Creates a fresh session, commits on success, rolls back on exception,
+    and always closes. Use in Celery tasks instead of manual SessionLocal().
+
+    Usage:
+        with task_session() as db:
+            result = _execute_something(db, ...)
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+async def run_in_db(func):
+    """Run a sync DB function in a thread-pool executor with a fresh session.
+
+    Use this inside async streaming endpoints to avoid blocking the event
+    loop during DB writes. The function receives a Session and must not
+    close it (the wrapper handles cleanup).
+
+    Example:
+        await run_in_db(lambda db: create_entry(db, ...))
+    """
+    import asyncio
+
+    def _runner():
+        db = SessionLocal()
+        try:
+            return func(db)
+        finally:
+            db.close()
+
+    return await asyncio.get_event_loop().run_in_executor(None, _runner)

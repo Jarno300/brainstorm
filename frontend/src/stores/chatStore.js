@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-import { streamMessage } from '../api';
-import { fetchMessages } from '../services/chatService';
-import useBrainstormStore from './brainstormStore';
+import { streamMessage, getMessages } from '../api';
+import logger from '../utils/logger';
 
 const useChatStore = create((set, get) => ({
   // State
@@ -16,14 +15,20 @@ const useChatStore = create((set, get) => ({
   // Actions
 
   loadMessages: async (brainstormId) => {
-    const msgs = await fetchMessages(brainstormId);
-    set({ messages: msgs });
-    return msgs;
+    try {
+      const res = await getMessages(brainstormId);
+      const msgs = res.data?.messages || res.data || [];
+      set({ messages: msgs });
+      return msgs;
+    } catch (err) {
+      logger.error('Failed to load messages:', err);
+      set({ messages: [] });
+      return [];
+    }
   },
 
-  sendMessage: async (content) => {
-    const brainstorm = useBrainstormStore.getState().activeBrainstorm;
-    if (!brainstorm || get()._sending) return;
+  sendMessage: async (brainstormId, content) => {
+    if (!brainstormId || get()._sending) return;
 
     get()._sending = true;
     set({ sending: true, chatError: '' });
@@ -33,7 +38,7 @@ const useChatStore = create((set, get) => ({
 
     const userMsg = {
       id: userMsgId,
-      brainstorm_id: brainstorm.id,
+      brainstorm_id: brainstormId,
       role: 'user',
       content,
       created_at: new Date().toISOString(),
@@ -45,7 +50,7 @@ const useChatStore = create((set, get) => ({
         userMsg,
         {
           id: thinkingMessageId,
-          brainstorm_id: brainstorm.id,
+          brainstorm_id: brainstormId,
           role: 'assistant',
           content: '',
           isThinking: true,
@@ -59,7 +64,7 @@ const useChatStore = create((set, get) => ({
     let firstToken = true;
 
     const controller = streamMessage(
-      { brainstorm_id: brainstorm.id, message: content },
+      { brainstorm_id: brainstormId, message: content },
       {
         onToken: (token) => {
           streamedContent += token;
@@ -84,7 +89,6 @@ const useChatStore = create((set, get) => ({
             streamAbort: null,
           }));
           get()._sending = false;
-          useBrainstormStore.getState().loadList();
         },
 
         onError: (error) => {

@@ -92,6 +92,24 @@ def get_current_user(
         )
 
     try:
+        # API Key auth: tokens starting with "bsk_"
+        if token.startswith("bsk_"):
+            from app.models.api_key import ApiKey
+            keys = db.query(ApiKey).filter(
+                ApiKey.is_active == True,
+            ).all()
+            for key in keys:
+                if ApiKey.verify(token, key.key_hash):
+                    # Update last used
+                    key.last_used_at = datetime.now(timezone.utc)
+                    db.commit()
+                    user = db.query(User).filter(User.id == key.user_id).first()
+                    if not user:
+                        raise HTTPException(status_code=401, detail="User not found")
+                    return user
+            raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+
+        # JWT auth
         payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
         if not user_id:

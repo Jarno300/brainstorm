@@ -6,8 +6,11 @@ from app.models.topic_edge import TopicEdge
 from app.models.library_entry import LibraryEntry
 from app.models.map_suggestion_dismissal import MapSuggestionDismissal
 from app.models.provider_setting import ProviderSetting
+from app.models.flashcard import Flashcard
+from app.models.organization import Organization, OrganizationMember, OrganizationInvite
 
 __all__ = [
     "User", "Brainstorm", "Message", "Topic", "TopicEdge",
     "LibraryEntry", "MapSuggestionDismissal", "ProviderSetting",
+    "Flashcard", "Organization", "OrganizationMember", "OrganizationInvite",
 ]

@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import uuid
 
-from app.database import get_db, SessionLocal
+from app.database import get_db, run_in_db
 from app.sanitize import sanitize_text
 
 logger = logging.getLogger(__name__)
@@ -155,17 +155,15 @@ async def chat_stream(
             yield f"data: {json.dumps({'error': error_message})}\n\n"
             return
 
-        # Persist the AI message.
-        # We must open a fresh session here because the FastAPI dependency
-        # session (db) is closed by get_db()'s finally block once the
-        # StreamingResponse starts sending headers.
-        persist_db = SessionLocal()
-        try:
-            if full_response:
-                ai_msg = message_service.create_message(
-                    persist_db, request.brainstorm_id, "assistant", full_response
+        # Persist the AI message via thread-pool executor.
+        if full_response:
+            try:
+                msg_id = await run_in_db(
+                    lambda db: message_service.create_message(
+                        db, request.brainstorm_id, "assistant", full_response
+                    ).id
                 )
-                yield f"data: {json.dumps({'done': True, 'message_id': str(ai_msg.id)})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'message_id': str(msg_id)})}\n\n"
 
                 # Dispatch async classification with synchronous fallback
                 try:
@@ -176,10 +174,11 @@ async def chat_stream(
                         process_message_classification_sync(str(request.brainstorm_id))
                     except Exception as sync_e:
                         logger.error("Synchronous classification also failed: %s", sync_e)
-            else:
-                yield f"data: {json.dumps({'done': True, 'error': 'Empty response from model'})}\n\n"
-        finally:
-            persist_db.close()
+            except Exception as e:
+                logger.error("Failed to persist chat message: %s", e)
+                yield f"data: {json.dumps({'error': f'Failed to save message: {e}'})}\n\n"
+        else:
+            yield f"data: {json.dumps({'done': True, 'error': 'Empty response from model'})}\n\n"
 
     return StreamingResponse(
         event_stream(),

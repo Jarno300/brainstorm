@@ -13,15 +13,17 @@ class Brainstorm(Base):
     title = Column(String(255), default="New Brainstorm", index=True)
     created_at = Column(DateTime, default=utcnow, index=True)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
-    model = Column(String(100), default="deepseek/deepseek-chat")
+    model = Column(String(100), default="")
     is_active = Column(Boolean, default=True)
     summary = Column(Text, default="")
     share_token = Column(UUID(as_uuid=True), nullable=True, unique=True, default=None, index=True)
     is_published = Column(Boolean, default=False)
     deleted_at = Column(DateTime, nullable=True, default=None, index=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True, default=None)
 
     # Relationships
     user = relationship("User", back_populates="brainstorms")
+    organization = relationship("Organization", back_populates="brainstorms")
     messages = relationship("Message", back_populates="brainstorm", cascade="all, delete-orphan", passive_deletes=True)
     topics = relationship("Topic", back_populates="brainstorm", cascade="all, delete-orphan", passive_deletes=True)
     topic_edges = relationship("TopicEdge", back_populates="brainstorm", cascade="all, delete-orphan", passive_deletes=True)

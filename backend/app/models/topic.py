@@ -33,6 +33,7 @@ class Topic(Base):
     position_x = Column(Float, default=0.0)
     position_y = Column(Float, default=0.0)
     outline = Column(FlexibleJSON, nullable=True, default=None)
+    taxonomy = Column(FlexibleJSON, nullable=True, default=None)
 
     brainstorm = relationship("Brainstorm", back_populates="topics")
 

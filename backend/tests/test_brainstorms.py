@@ -38,7 +38,8 @@ class TestCreateBrainstorm:
         assert resp.status_code == 201
         data = resp.json()
         assert data["title"] == "My Research"
-        assert data["model"] == "ollama/llama3.2:1b"
+        from app.config import DEFAULT_MODEL
+        assert data["model"] == DEFAULT_MODEL
         assert "id" in data
 
     def test_create_brainstorm_with_model(self, client, auth_headers):
@@ -107,7 +108,8 @@ class TestUpdateTitle:
         b = brainstorm_factory(title="Old Title")
 
         resp = client.patch(
-            f"/api/brainstorms/{b.id}/title?title=New%20Title",
+            f"/api/brainstorms/{b.id}/title",
+            json={"title": "New Title"},
             headers=auth_headers,
         )
         assert resp.status_code == 200

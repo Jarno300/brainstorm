@@ -1,16 +1,17 @@
 import { create } from 'zustand';
 import {
-  fetchMap,
-  triggerMapRefresh,
-  patchTopic,
-  removeTopic,
-  deepenTopic,
-  addEdge,
-  removeEdge,
-  createBlankTopic,
-  streamTopicContent,
-  createConnectionTopic,
-} from '../services/mapService';
+  getMap,
+  refreshMap,
+  updateTopic,
+  deleteTopic,
+  exploreTopic,
+  createEdge,
+  deleteEdge,
+  createTopic,
+  generateTopicContent,
+  exploreConnection,
+  getGaps,
+} from '../api';
 import logger from '../utils/logger';
 
 const useMapStore = create((set, get) => ({
@@ -18,21 +19,31 @@ const useMapStore = create((set, get) => ({
   mapData: { topics: [], edges: [], suggestions: [] },
   selectedTopic: null,
   exploringTopic: null,         // { name, sourceTopicId }
+  exploringEdge: null,           // { sourceId, targetId, x, y, sourceName, targetName }
   hasClassified: false,
+  gaps: [],
   moveTimers: {},
 
   // Actions
 
   loadMap: async (brainstormId) => {
-    const data = await fetchMap(brainstormId);
-    if (data) set({ mapData: data });
-    return data;
+    try {
+      const res = await getMap(brainstormId);
+      if (res.data) set({ mapData: res.data });
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to load map:', err);
+    }
   },
 
   refreshMap: async (brainstormId) => {
-    const data = await triggerMapRefresh(brainstormId);
-    if (data) set({ mapData: data });
-    return data;
+    try {
+      const res = await refreshMap(brainstormId);
+      if (res.data) set({ mapData: res.data });
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to refresh map:', err);
+    }
   },
 
   selectTopic: (topic) => set({ selectedTopic: topic }),
@@ -40,10 +51,10 @@ const useMapStore = create((set, get) => ({
 
   updateTopic: async (brainstormId, topicId, data) => {
     try {
-      await patchTopic(brainstormId, topicId, data);
-      const mapRes = await fetchMap(brainstormId);
-      if (mapRes) set({ mapData: mapRes });
-      const fresh = mapRes?.topics?.find((t) => t.id === topicId);
+      await updateTopic(brainstormId, topicId, data);
+      const res = await getMap(brainstormId);
+      if (res.data) set({ mapData: res.data });
+      const fresh = res.data?.topics?.find((t) => t.id === topicId);
       if (fresh) set({ selectedTopic: fresh });
     } catch (err) {
       logger.error('Failed to update topic:', err);
@@ -52,7 +63,7 @@ const useMapStore = create((set, get) => ({
 
   deleteTopic: async (brainstormId, topicId) => {
     try {
-      await removeTopic(brainstormId, topicId);
+      await deleteTopic(brainstormId, topicId);
       set({ selectedTopic: null });
       await get().loadMap(brainstormId);
     } catch (err) {
@@ -62,8 +73,8 @@ const useMapStore = create((set, get) => ({
 
   exploreTopic: async (brainstormId, topicId) => {
     try {
-      const data = await deepenTopic(brainstormId, topicId);
-      if (data) set({ mapData: data });
+      const res = await exploreTopic(brainstormId, topicId);
+      if (res.data) set({ mapData: res.data });
     } catch (err) {
       logger.error('Failed to explore topic:', err);
     }
@@ -71,16 +82,23 @@ const useMapStore = create((set, get) => ({
 
   createEdge: async (brainstormId, sourceId, targetId) => {
     try {
-      await addEdge(brainstormId, sourceId, targetId);
+      await createEdge(brainstormId, {
+        source_topic_id: sourceId,
+        target_topic_id: targetId,
+        relationship: 'related',
+        weight: 0.5,
+      });
       await get().loadMap(brainstormId);
     } catch (err) {
-      logger.error('Failed to create edge:', err);
+      if (err?.response?.status !== 409) {
+        logger.error('Failed to create edge:', err);
+      }
     }
   },
 
   deleteEdge: async (brainstormId, edge) => {
     try {
-      await removeEdge(brainstormId, edge.id);
+      await deleteEdge(brainstormId, edge.id);
       await get().loadMap(brainstormId);
     } catch (err) {
       logger.error('Failed to delete edge:', err);
@@ -103,7 +121,7 @@ const useMapStore = create((set, get) => ({
     const timers = get().moveTimers;
     if (timers[topicId]) clearTimeout(timers[topicId]);
     timers[topicId] = setTimeout(() => {
-      patchTopic(brainstormId, topicId, { position_x: x, position_y: y }).catch(
+      updateTopic(brainstormId, topicId, { position_x: x, position_y: y }).catch(
         (err) => logger.error('Failed to save topic position:', err)
       );
     }, 500);
@@ -112,10 +130,12 @@ const useMapStore = create((set, get) => ({
   // Create a blank topic card (no AI generation)
   addBlankTopic: async (brainstormId, name) => {
     try {
-      const topic = await createBlankTopic(brainstormId, name);
-      // Reload the full map to get the topic with server-assigned fields
+      const res = await createTopic(brainstormId, {
+        name,
+        auto_generate: false,
+      });
       await get().loadMap(brainstormId);
-      return topic;
+      return res.data;
     } catch (err) {
       logger.error('Failed to add blank topic:', err);
       throw err;
@@ -155,10 +175,10 @@ const useMapStore = create((set, get) => ({
       // Sync the latest outline to the backend immediately
       const topic = get().mapData?.topics?.find(t => t.id === topicId);
       if (topic?.outline) {
-        await patchTopic(brainstormId, topicId, { outline: topic.outline });
+        await updateTopic(brainstormId, topicId, { outline: topic.outline });
       }
     }
-    return streamTopicContent(brainstormId, topicId, {
+    return generateTopicContent(brainstormId, topicId, {
       ...callbacks,
       onDone: async (event) => {
         await get().loadMap(brainstormId);
@@ -168,14 +188,31 @@ const useMapStore = create((set, get) => ({
   },
 
   setExploringTopic: (topic) => set({ exploringTopic: topic }),
+  setExploringEdge: (edge) => set({ exploringEdge: edge }),
   setHasClassified: (v) => set({ hasClassified: v }),
 
-  // Explore connection between two topics
+  // Gap detection
+  detectGaps: async (brainstormId) => {
+    try {
+      const res = await getGaps(brainstormId);
+      if (res.data) set({ gaps: res.data.gaps || [] });
+      return res.data;
+    } catch (err) {
+      logger.error('Failed to detect gaps:', err);
+    }
+  },
+
+  // Explore connection between two topics (dispatches to backend, result via WebSocket)
   exploreConnection: async (brainstormId, sourceId, targetId, x, y) => {
     try {
-      const topic = await createConnectionTopic(brainstormId, sourceId, targetId, x, y);
-      await get().loadMap(brainstormId);
-      return topic;
+      await exploreConnection(brainstormId, {
+        source_topic_id: sourceId,
+        target_topic_id: targetId,
+        position_x: x,
+        position_y: y,
+      });
+      // Don't loadMap here — the WebSocket topic_generated event will trigger it
+      // once the Celery task completes and the connection card is created.
     } catch (err) {
       logger.error('Failed to explore connection:', err);
       throw err;
@@ -187,7 +224,9 @@ const useMapStore = create((set, get) => ({
       mapData: { topics: [], edges: [], suggestions: [] },
       selectedTopic: null,
       exploringTopic: null,
+      exploringEdge: null,
       hasClassified: false,
+      gaps: [],
       moveTimers: {},
     }),
 }));

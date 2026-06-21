@@ -121,11 +121,21 @@ def _parse_research_response(raw: str) -> Optional[ResearchResult]:
     )
 
 
-def _research_to_markdown(topic_name: str, result: ResearchResult, library_content: str = "") -> str:
+def _research_to_markdown(
+    topic_name: str,
+    result: ResearchResult,
+    library_content: str = "",
+    include_taxonomy: bool = True,
+) -> str:
     """Convert a ResearchResult into structured markdown for the library entry.
 
     The library_content parameter can contain additional LLM-generated content
     to prepend. If empty, builds the entire document from ResearchResult.
+
+    Taxonomy sections (parent/child/related topics) are only included when
+    include_taxonomy=True. By default they are omitted because
+    build_knowledge_map() creates proposition topics directly on the canvas,
+    making markdown-level taxonomy redundant.
     """
     display = topic_name.replace("-", " ").title()
     lines = []
@@ -163,22 +173,24 @@ def _research_to_markdown(topic_name: str, result: ResearchResult, library_conte
                 lines.append(f"- **{name}**: {desc}")
             lines.append("")
 
-    # Taxonomy sections — always from ResearchResult
-    for key, heading in [
-        ("parent_topics", "Parent Topics"),
-        ("child_topics", "Child Topics"),
-        ("related_topics", "Related Topics"),
-    ]:
-        items = getattr(result, key, [])
-        if not items:
-            continue
-        lines.append(f"## {heading}")
-        lines.append("")
-        for item in items:
-            name = item.get("name", "unknown")
-            desc = item.get("description", "")
-            lines.append(f"- {name} - {desc}")
-        lines.append("")
+    # Taxonomy sections — only included when requested (e.g., from the chat pipeline
+    # where proposition topics aren't created separately)
+    if include_taxonomy:
+        for key, heading in [
+            ("parent_topics", "Parent Topics"),
+            ("child_topics", "Child Topics"),
+            ("related_topics", "Related Topics"),
+        ]:
+            items = getattr(result, key, [])
+            if not items:
+                continue
+            lines.append(f"## {heading}")
+            lines.append("")
+            for item in items:
+                name = item.get("name", "unknown")
+                desc = item.get("description", "")
+                lines.append(f"- {name} - {desc}")
+            lines.append("")
 
     return "\n".join(lines)
 
@@ -231,6 +243,7 @@ def build_knowledge_map(
     topic_name: str,
     result: ResearchResult,
     commit: bool = True,
+    model: Optional[str] = None,
 ) -> Topic:
     """Build the knowledge map from a ResearchResult.
 
@@ -279,8 +292,17 @@ def build_knowledge_map(
         file_name=file_name,
         content=md_content,
         commit=False,
+        source_type="research",
+        source_model=model if model else None,
     )
     primary.library_path = entry.file_path
+
+    # Store taxonomy directly on the topic (no markdown roundtrip)
+    primary.taxonomy = {
+        "parent_topics": result.parent_topics,
+        "child_topics": result.child_topics,
+        "related_topics": result.related_topics,
+    }
 
     # Clear old propositions and suggestion edges for this topic
     db.query(TopicEdge).filter(

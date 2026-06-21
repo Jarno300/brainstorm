@@ -51,7 +51,19 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 
 # ─── Auth ─────────────────────────────────────────────────────
-SECRET_KEY = os.getenv("SECRET_KEY", "brainstorm-secret-key-change-in-production")
+# In development, auto-generate a random key so there's never a
+# hardcoded default that could accidentally reach production.
+_SECRET_ENV = os.getenv("SECRET_KEY", "")
+if _SECRET_ENV:
+    SECRET_KEY = _SECRET_ENV
+elif os.getenv("APP_ENV", "development") == "development":
+    import secrets
+    SECRET_KEY = secrets.token_hex(32)
+else:
+    raise RuntimeError(
+        "SECRET_KEY is required in production/staging. "
+        "Generate one with:  openssl rand -hex 32"
+    )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "72"))
 
@@ -82,13 +94,6 @@ def validate_config():
     elif APP_ENV != "development" and DATABASE_URL.startswith("sqlite"):
         errors.append(f"Cannot use SQLite in {APP_ENV} environment — set DATABASE_URL to a PostgreSQL connection string")
 
-    # In production, the default SECRET_KEY is a critical vulnerability
-    if APP_ENV in ("production", "staging") and SECRET_KEY == "brainstorm-secret-key-change-in-production":
-        errors.append(
-            "SECRET_KEY is set to the default insecure value. "
-            "Generate a strong key (e.g. `openssl rand -hex 32`) and set it via the SECRET_KEY environment variable."
-        )
-
     # Warn about missing API keys (non-fatal)
     warnings = []
     if not DEEPSEEK_API_KEY:
@@ -97,13 +102,6 @@ def validate_config():
         warnings.append("OPENAI_API_KEY not set — OpenAI models will fail")
     if not ANTHROPIC_API_KEY:
         warnings.append("ANTHROPIC_API_KEY not set — Anthropic models will fail")
-
-    # Warn if using default SECRET_KEY in development (not fatal, but noisy)
-    if APP_ENV == "development" and SECRET_KEY == "brainstorm-secret-key-change-in-production":
-        warnings.append(
-            "SECRET_KEY is the default value. This is fine for local development "
-            "but MUST be changed before deploying to staging or production."
-        )
 
     if errors:
         raise ValueError(
