@@ -15,7 +15,6 @@ from app.services.ai_service import (
     chat_with_model, stream_chat_with_model,
     resolve_credentials,
 )
-from app.tasks.classification_tasks import process_message_classification, process_message_classification_sync
 from app.api.auth import get_current_user
 from app.models.user import User
 
@@ -79,17 +78,6 @@ async def chat(
     ai_msg = message_service.create_message(
         db, request.brainstorm_id, "assistant", ai_response
     )
-
-    # Build the topic/library/map artifacts asynchronously via Celery.
-    # Falls back to synchronous classification if Celery/Redis is unavailable.
-    try:
-        process_message_classification.delay(str(request.brainstorm_id))
-    except Exception as e:
-        logger.warning("Celery dispatch failed, running classification synchronously: %s", e)
-        try:
-            process_message_classification_sync(str(request.brainstorm_id))
-        except Exception as sync_e:
-            logger.error("Synchronous classification also failed: %s", sync_e)
 
     return ChatResponse(
         message_id=ai_msg.id,
@@ -164,16 +152,6 @@ async def chat_stream(
                     ).id
                 )
                 yield f"data: {json.dumps({'done': True, 'message_id': str(msg_id)})}\n\n"
-
-                # Dispatch async classification with synchronous fallback
-                try:
-                    process_message_classification.delay(str(request.brainstorm_id))
-                except Exception as e:
-                    logger.warning("Celery dispatch failed, running classification synchronously: %s", e)
-                    try:
-                        process_message_classification_sync(str(request.brainstorm_id))
-                    except Exception as sync_e:
-                        logger.error("Synchronous classification also failed: %s", sync_e)
             except Exception as e:
                 logger.error("Failed to persist chat message: %s", e)
                 yield f"data: {json.dumps({'error': f'Failed to save message: {e}'})}\n\n"

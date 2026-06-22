@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
+import asyncio
 import uuid
 import json
 from datetime import datetime, timezone
@@ -20,10 +21,6 @@ from app.services.gap_detection_service import detect_gaps
 from app.services.topic_enrichment_service import (
     generate_library_content,
     generate_topic_taxonomy,
-)
-from app.services.ai_service import (
-    stream_chat_with_model,
-    resolve_credentials,
 )
 from app.services import map_service
 from app.api.auth import get_current_user
@@ -240,8 +237,8 @@ def create_topic_manual(
             )
             if taxonomy:
                 topic.taxonomy = taxonomy
-                from app.tasks.classification_tasks import _taxonomy_to_markdown
-                taxonomy_md = _taxonomy_to_markdown(taxonomy)
+                from app.services.topic_research_service import taxonomy_to_markdown
+                taxonomy_md = taxonomy_to_markdown(taxonomy)
                 if taxonomy_md:
                     enriched += "\n\n" + taxonomy_md
 
@@ -299,8 +296,8 @@ def explore_topic(
     )
     if taxonomy:
         topic.taxonomy = taxonomy
-        from app.tasks.classification_tasks import _taxonomy_to_markdown
-        taxonomy_md = _taxonomy_to_markdown(taxonomy)
+        from app.services.topic_research_service import taxonomy_to_markdown
+        taxonomy_md = taxonomy_to_markdown(taxonomy)
         if taxonomy_md:
             enriched_content += "\n\n" + taxonomy_md
 
@@ -325,47 +322,6 @@ def explore_topic(
 
 
 # ─── Topic Content Generation (streaming) ─────────────────────
-
-GENERATE_OUTLINE_PROMPT = """You are a knowledgeable researcher. Write comprehensive content about "{topic_name}".
-
-Start with a single-line summary prefixed with "> ".
-
-Then cover the following sections using ## headings:
-
-{sections}
-
-For each section, write well-structured paragraphs using markdown formatting
-(lists, bold, italics as appropriate). Be thorough, accurate, and engaging.
-
-Do not include any preamble or meta-commentary — start directly with the summary line."""
-
-
-GENERATE_FULL_PROMPT = """You are a knowledgeable researcher. Write comprehensive content about "{topic_name}".
-
-Structure your response as follows:
-
-> A single-line summary capturing the essence of {topic_name}.
-
-## Overview
-3-4 paragraphs: what it is, how it works, key characteristics, history, why it matters. Minimum 150 words.
-
-## Key Concepts
-- **Concept Name**: 2-3 sentence explanation
-- **Concept Name**: 2-3 sentence explanation
-(4-6 entries)
-
-## Use Cases
-- **Use Case**: 2-3 sentence description
-- **Use Case**: 2-3 sentence description
-(2-4 entries)
-
-## Related Topics
-- topic-name-slug - How it relates to or compares with {topic_name}
-- another-topic-slug - How this topic complements {topic_name}
-(2-3 entries, use lowercase-hyphenated names)
-
-Use markdown formatting throughout. Be thorough, accurate, and engaging.
-Do not include any preamble or meta-commentary — start directly with the summary line."""
 
 
 def _persist_generated_content(
@@ -432,20 +388,13 @@ def generate_topic_content(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate AI content for a topic.
+    """Generate content for a topic using Wikipedia.
 
-    Two modes, chosen automatically:
+    Fetches the topic's Wikipedia article and streams the structured
+    markdown content via Server-Sent Events, paragraph by paragraph.
 
-    1. **With outline** — if the topic has stored outline sections, content
-       is generated to match those section titles exactly.
-
-    2. **Full research** — if no outline exists, a comprehensive research
-       document is generated with overview, key concepts, use cases, and
-       related topics.
-
-    The response is streamed via Server-Sent Events. On completion, the
-    summary is saved to topic.description, a LibraryEntry is created, and
-    the topic's outline is cleared (if it existed).
+    On completion, the summary is saved to topic.description, a
+    LibraryEntry is created, and the topic's outline is cleared.
     """
     brainstorm = brainstorm_service.get_brainstorm(db, brainstorm_id, user_id=current_user.id)
     if not brainstorm:
@@ -457,52 +406,43 @@ def generate_topic_content(
 
     display_name = topic.name.replace("-", " ").title()
 
-    # Choose prompt based on whether the topic has an outline
-    has_outline = topic.outline and isinstance(topic.outline, list) and len(topic.outline) > 0
-
-    if has_outline:
-        section_titles = [
-            s.get("title", "").strip()
-            for s in topic.outline
-            if isinstance(s, dict) and s.get("title", "").strip()
-        ]
-        if not section_titles:
-            has_outline = False
-
-    if has_outline:
-        sections_text = "\n".join(f"## {t}" for t in section_titles)
-        prompt = GENERATE_OUTLINE_PROMPT.format(topic_name=display_name, sections=sections_text)
-    else:
-        prompt = GENERATE_FULL_PROMPT.format(topic_name=display_name)
-
-    model = brainstorm.model
-    api_key, base_url = resolve_credentials(db, model)
-
     async def event_stream():
-        full_response = ""
+        from app.services.wikipedia_service import get_page, page_to_markdown, search
+
+        # Resolve topic to Wikipedia article
         try:
-            async for token in stream_chat_with_model(
-                [{"role": "user", "content": prompt}],
-                model,
-                api_key=api_key,
-                base_url=base_url,
-            ):
-                full_response += token
-                yield f"data: {json.dumps({'token': token})}\n\n"
+            page = await get_page(display_name)
+            if page is None:
+                # Try search
+                results = await search(display_name, limit=1)
+                if results:
+                    page = await get_page(results[0].title)
         except Exception as e:
-            logger.error("Generate stream error for topic %s: %s", topic_id, e)
+            logger.error("Wikipedia fetch error for topic %s: %s", topic_id, e)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
 
-        if not full_response.strip():
-            yield f"data: {json.dumps({'done': True, 'error': 'Empty response from model'})}\n\n"
+        if page is None:
+            yield f"data: {json.dumps({'done': True, 'error': 'No Wikipedia article found for this topic'})}\n\n"
             return
 
-        # Persist via thread-pool executor (avoids blocking the event loop)
+        # Generate markdown content
+        full_response = page_to_markdown(page)
+
+        # Stream paragraphs with a small delay for visual feedback
+        paragraphs = full_response.split("\n\n")
+        for para in paragraphs:
+            if para.strip():
+                token = para + "\n\n"
+                full_response += ""  # already have the full content
+                yield f"data: {json.dumps({'token': token})}\n\n"
+                await asyncio.sleep(0.05)  # small delay for smooth streaming
+
+        # Persist via thread-pool executor
         try:
             result = await run_in_db(
-                lambda db: _persist_generated_content(
-                    db, brainstorm_id, topic_id, topic.name, full_response,
+                lambda db_session: _persist_generated_content(
+                    db_session, brainstorm_id, topic_id, topic.name, full_response,
                 )
             )
             yield f"data: {json.dumps({'done': True, **result})}\n\n"

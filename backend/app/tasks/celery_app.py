@@ -20,7 +20,6 @@ celery_app = Celery(
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
     include=[
-        "app.tasks.classification_tasks",
         "app.tasks.research_tasks",
     ],
 )

@@ -81,6 +81,9 @@ def _execute_research(db, brainstorm_id: uuid.UUID, topic_name: str) -> dict:
     # Step 2: Build the knowledge map (topics, edges, library entry)
     primary = build_knowledge_map(db, brainstorm_id, topic_name, result, commit=True, model=brainstorm.model)
 
+    # Invalidate the map cache so the frontend sees the new topics
+    invalidate_map_cache(brainstorm_id)
+
     # Step 3: Notify frontend via WebSocket
     props_count = sum(1 for _ in [
         result.parent_topics, result.child_topics, result.related_topics,

@@ -1,17 +1,11 @@
 """
-Topic research service — deep research + knowledge map generation in one LLM call.
+Topic research service — knowledge map generation from Wikipedia data.
 
-Replaces the old multi-step pipeline:
-  1. chat_with_model  → chat response
-  2. extract_topics   → topic names from conversation
-  3. generate_library → markdown from conversation
-  4. generate_taxonomy → parent/child/related from library
-
-With a single research call that draws from the LLM's full knowledge,
-not just the conversation transcript.
+Fetches structured knowledge from Wikipedia, builds a knowledge map
+with topic cards, library entries, and proposition topics for the
+parent/child/related taxonomy.
 """
 
-import json
 import logging
 import re
 import time
@@ -23,7 +17,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.topic import Topic
-from app.services.ai_service import chat_with_model_sync
 from app.services.topic_service import (
     create_topic, create_edge, get_topic_by_name,
     normalize_topic_name, delete_propositions,
@@ -38,41 +31,6 @@ logger = logging.getLogger(__name__)
 # Research Prompt — one call to rule them all
 # ─────────────────────────────────────────────────────────────────────
 
-RESEARCH_PROMPT = """You are a knowledge researcher. Research the topic "{topic_name}" thoroughly.
-Draw from your full knowledge base — not just a surface summary.
-
-Return a single JSON object with the structure below. Every field is required.
-
-{{
-  "summary": "1-2 sentence overview capturing the essence of {topic_name}",
-  "overview": "3-4 paragraphs comprehensive explanation. Cover: what it is, how it works, key characteristics, history, and why it matters. Minimum 150 words.",
-  "key_concepts": [
-    {{"name": "Concept Name", "description": "2-3 sentence explanation"}}
-  ],
-  "use_cases": [
-    {{"name": "Use Case", "description": "2-3 sentence description"}}
-  ],
-  "parent_topics": [
-    {{"name": "broader-field-slug", "description": "How this topic fits into or relates to this broader field"}}
-  ],
-  "child_topics": [
-    {{"name": "sub-topic-slug", "description": "What this sub-topic is and its relationship to {topic_name}"}}
-  ],
-  "related_topics": [
-    {{"name": "related-topic-slug", "description": "How this relates to, compares with, or complements {topic_name}"}}
-  ]
-}}
-
-Rules:
-- key_concepts: 4-6 entries, names in plain English (not slugs) with thorough descriptions
-- use_cases: 2-4 entries with realistic scenarios
-- parent_topics / child_topics / related_topics: 2-3 entries each
-- Topic names in parent/child/related MUST be lowercase-hyphenated slugs (e.g., "data-engineering")
-- DO NOT wrap the JSON in markdown code fences
-- DO NOT include any text before or after the JSON
-- Only return valid JSON"""
-
-
 @dataclass
 class ResearchResult:
     """Parsed research output from the LLM."""
@@ -83,42 +41,6 @@ class ResearchResult:
     parent_topics: List[dict] = field(default_factory=list)
     child_topics: List[dict] = field(default_factory=list)
     related_topics: List[dict] = field(default_factory=list)
-
-
-def _parse_research_response(raw: str) -> Optional[ResearchResult]:
-    """Parse the LLM's JSON response into a ResearchResult."""
-    raw = raw.strip()
-    raw = re.sub(r'^```(?:json)?\s*', '', raw)
-    raw = re.sub(r'\s*```$', '', raw)
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.warning("research parse error: %s | raw_preview=%s", e, raw[:200])
-        return None
-
-    if not isinstance(data, dict):
-        return None
-
-    def _list_of_dicts(key: str) -> List[dict]:
-        items = data.get(key, [])
-        if not isinstance(items, list):
-            return []
-        return [
-            {"name": str(item.get("name", "")), "description": str(item.get("description", ""))}
-            for item in items
-            if isinstance(item, dict) and item.get("name")
-        ]
-
-    return ResearchResult(
-        summary=str(data.get("summary", "")),
-        overview=str(data.get("overview", "")),
-        key_concepts=_list_of_dicts("key_concepts"),
-        use_cases=_list_of_dicts("use_cases"),
-        parent_topics=_list_of_dicts("parent_topics"),
-        child_topics=_list_of_dicts("child_topics"),
-        related_topics=_list_of_dicts("related_topics"),
-    )
 
 
 def _research_to_markdown(
@@ -195,39 +117,73 @@ def _research_to_markdown(
     return "\n".join(lines)
 
 
+def taxonomy_to_markdown(taxonomy: dict) -> str:
+    """Convert a taxonomy dict to markdown sections for library entries.
+
+    Args:
+        taxonomy: Dict with parent_topics, child_topics, related_topics keys,
+                  each containing [{"name": str, "description": str}, ...]
+
+    Returns:
+        Markdown string with ## Parent Topics, ## Child Topics, ## Related Topics.
+    """
+    sections = []
+    for key, heading in [
+        ("parent_topics", "Parent Topics"),
+        ("child_topics", "Child Topics"),
+        ("related_topics", "Related Topics"),
+    ]:
+        items = taxonomy.get(key, [])
+        if items:
+            lines = [f"## {heading}", ""]
+            for item in items:
+                name = item.get("name", "unknown")
+                desc = item.get("description", "")
+                lines.append(f"- {name} - {desc}")
+            sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
 def research_topic(
     topic_name: str,
     model: Optional[str] = None,
 ) -> Optional[ResearchResult]:
-    """Research a topic with a single LLM call.
+    """Research a topic using Wikipedia.
 
-    Returns a ResearchResult with overview, key concepts, use cases,
-    and parent/child/related taxonomy — or None on failure.
+    Resolves the topic name to a Wikipedia article, fetches structured
+    page data, and transforms it into a ResearchResult with overview,
+    key concepts, use cases, and parent/child/related taxonomy.
+
+    Returns None if Wikipedia has no article for this topic.
     """
+    from app.services.wikipedia_service import resolve_page_sync, page_to_research_result
+
     t0 = time.perf_counter()
     display = topic_name.replace("-", " ").title()
 
-    prompt = RESEARCH_PROMPT.format(topic_name=display)
-    logger.debug("research_topic start | topic=%s prompt_chars=%d", topic_name, len(prompt))
+    logger.debug("research_topic start (wikipedia) | topic=%s", topic_name)
 
     try:
-        raw = chat_with_model_sync([{"role": "user", "content": prompt}], model=model)
+        page = resolve_page_sync(display)
         elapsed = time.perf_counter() - t0
 
-        result = _parse_research_response(raw)
-        if result is None:
+        if page is None:
             logger.warning(
-                "research_topic parse_failed | topic=%s elapsed=%.2fs raw_preview=%s",
-                topic_name, elapsed, raw[:200],
+                "research_topic no_article | topic=%s elapsed=%.2fs",
+                topic_name, elapsed,
             )
             return None
 
+        result = page_to_research_result(page)
+
         logger.debug(
-            "research_topic done | topic=%s elapsed=%.2fs "
-            "concepts=%d use_cases=%d parents=%d children=%d related=%d",
+            "research_topic done (wikipedia) | topic=%s elapsed=%.2fs "
+            "concepts=%d use_cases=%d parents=%d children=%d related=%d "
+            "pageid=%d",
             topic_name, elapsed,
             len(result.key_concepts), len(result.use_cases),
-            len(result.parent_topics), len(result.child_topics), len(result.related_topics),
+            len(result.parent_topics), len(result.child_topics),
+            len(result.related_topics), page.pageid,
         )
         return result
 
