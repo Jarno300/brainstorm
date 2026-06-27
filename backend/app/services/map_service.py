@@ -206,3 +206,55 @@ def get_conversation_text(db: Session, brainstorm_id: uuid.UUID, limit: int = 20
         role_label = "User" if msg.role.value == "user" else "Assistant"
         parts.append(f"{role_label}: {msg.content}")
     return "\n\n".join(parts)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Content persistence (shared by generate_topic_content endpoint)
+# ═══════════════════════════════════════════════════════════════
+
+def persist_generated_content(
+    db: Session,
+    brainstorm_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    topic_name: str,
+    full_response: str,
+) -> dict:
+    """Persist generated content to DB — called via run_in_db from async context.
+
+    Extracts the summary (first "> " blockquote line), updates the topic,
+    creates a library entry via enrichment_service, and publishes an event.
+    """
+    from app.services.enrichment_service import create_topic_library_entry
+    from app.services.realtime_service import publish_brainstorm_event
+
+    # Parse summary: first line starting with "> " is the summary
+    lines = full_response.split("\n")
+    summary = ""
+    if lines and lines[0].startswith("> "):
+        summary = lines[0][2:].strip()
+
+    # Reload topic in the fresh session
+    topic = topic_service.get_topic(db, topic_id)
+    if topic is None:
+        raise RuntimeError(
+            f"Topic {topic_id} not found in database — it may have been "
+            "deleted between content generation and persistence."
+        )
+
+    if summary:
+        topic.description = summary
+    topic.outline = None
+    topic.confidence = max(topic.confidence or 0.0, 0.8)
+
+    # Persist via enrichment service (shared logic)
+    create_topic_library_entry(
+        db, brainstorm_id,
+        topic=topic,
+        folder_name=topic_name,
+        content=full_response,
+        source_type="generate",
+        commit=True,
+        publish_event=True,
+    )
+
+    return {"topic_id": str(topic_id), "summary": summary}

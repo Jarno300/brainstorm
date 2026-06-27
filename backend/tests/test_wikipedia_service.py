@@ -476,9 +476,9 @@ class TestPageToMarkdown:
         assert md.startswith("# Quantum computing")
         assert "> A quantum computer" in md
         assert "## Overview" in md
-        assert "## Key Concepts" in md
-        assert "## Use Cases" in md
         assert "## Source" in md
+        # Dynamic sections are not rendered when section_texts is empty
+        # (mock page has no section_texts — real pages get Wikipedia content)
 
     def test_includes_attribution(self):
         page = _make_mock_page()
@@ -498,6 +498,39 @@ class TestPageToMarkdown:
         assert "# Minimal" in md
         # Should not crash
         assert isinstance(md, str)
+
+    def test_renders_dynamic_sections_from_section_texts(self):
+        """When section_texts are present, each H2 becomes a ## section."""
+        page = WikipediaPage(
+            title="Test Article", pageid=1,
+            summary="Test summary.", overview="Test overview paragraph.",
+            description="",
+            sections=[
+                {"toclevel": 1, "line": "History", "index": "1", "number": "1"},
+                {"toclevel": 1, "line": "Features", "index": "2", "number": "2"},
+                {"toclevel": 1, "line": "See also", "index": "3", "number": "3"},
+            ],
+            section_texts={
+                "1": "The history of this topic dates back to ancient times.",
+                "2": "Key features include speed and reliability.",
+                "3": "See also other topics.",
+            },
+            categories=[], links=[], linkshere=[], full_text="", image_url="",
+        )
+        md = page_to_markdown(page)
+
+        assert "# Test Article" in md
+        assert "## Overview" in md
+        assert "## History" in md
+        assert "The history of this topic" in md
+        assert "## Features" in md
+        assert "Key features include" in md
+        # Meta sections should be excluded
+        assert "## See also" not in md
+        # Old rigid format should be gone
+        assert "## Key Concepts" not in md
+        assert "## Use Cases" not in md
+        assert "## Source" in md
 
 
 class TestPageToTaxonomy:

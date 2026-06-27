@@ -26,7 +26,7 @@ from typing import Dict, List, Optional
 
 import httpx
 
-from app.services.topic_research_service import ResearchResult
+from app.schemas.research import ResearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +139,10 @@ async def _api_get(params: dict, timeout: int = WIKIPEDIA_TIMEOUT) -> dict:
     headers = {
         "User-Agent": WIKIPEDIA_USER_AGENT,
         "Accept": "application/json",
+        # httpx sends "Accept-Encoding: gzip, deflate, br" by default,
+        # which triggers Wikipedia's bot detection (403). Force identity
+        # (no compression) to match what curl sends.
+        "Accept-Encoding": "identity",
     }
     params_with_format = {**params, "format": "json"}
 
@@ -172,15 +176,40 @@ def _filter_categories(categories: List[str]) -> List[str]:
 
 
 def _filter_links(links: List[str]) -> List[str]:
-    """Filter out non-topic links (lists, disambiguation, etc.)."""
-    skip_patterns = (
+    """Filter out non-topic links (lists, disambiguation, navbox noise, etc.).
+
+    Wikipedia's prop=links returns ALL wikilinks on a page in page-order,
+    including navbox/template links (e.g., "1-bit computing" from a
+    "Types of computers" navbox on the "Quantum computing" page). These
+    are not semantically related and must be filtered out.
+    """
+    # Patterns that indicate non-topic / structural links
+    skip_starts = (
         "List of", "Lists of", "Outline of", "Index of",
         "Glossary of", "Timeline of", "History of",
-        " (disambiguation)", "(disambiguation)",
+        "Comparison of", "Bibliography of",
     )
+    # Navbox noise: numeric-bit/numeric-byte patterns (e.g., "1-bit computing")
+    # and pure acronym links (e.g., "ACPI", "ARM", "ISA")
+    import re as _re
+    _navbox_pattern = _re.compile(
+        r'^\d+[-\.]?\s*(bit|byte|word)\b'  # "1-bit computing", "8 byte"
+        r'|^[A-Z]{2,5}$'                      # pure acronyms: "ACPI", "ARM"
+        r'|^[A-Z][a-z]+\s+[A-Z]{2,5}$'       # "Abelian group", "ARM architecture" — keep?
+    )
+    _disambig_pattern = _re.compile(r'\(disambiguation\)')
+
     result = []
     for link in links:
-        if link.startswith(skip_patterns) or "(disambiguation)" in link:
+        if link.startswith(skip_starts):
+            continue
+        if _disambig_pattern.search(link):
+            continue
+        # Filter navbox/template noise (but keep links with substantive names)
+        if _navbox_pattern.match(link):
+            continue
+        # Filter very short links (1-2 chars) — usually template artifacts
+        if len(link.strip()) <= 2:
             continue
         result.append(link)
     return result
@@ -486,8 +515,24 @@ async def get_section_text(title: str, section_index: int) -> str:
         })
         html = data.get("parse", {}).get("text", {}).get("*", "")
 
-        # Strip HTML tags to get plain text
-        text = re.sub(r"<[^>]+>", " ", html)
+        # Strip HTML tags, comments, and style/script blocks
+        text = re.sub(r"<!--.*?-->", " ", html, flags=re.DOTALL)
+        text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.DOTALL)
+        text = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.DOTALL)
+        text = re.sub(r"<[^>]+>", " ", text)
+
+        # Decode HTML entities (&amp;, &#91;, etc.)
+        import html as html_module
+        text = html_module.unescape(text)
+
+        # Remove wiki artifacts
+        text = re.sub(r"\[\s*edit\s*\]", "", text)
+        text = re.sub(r"\[\s*update\s*\]", "", text)
+
+        # Remove stray CSS class names leaking from inline styles
+        text = re.sub(r"\b(mw-parser-output|hatnote|mw-headline|mw-editsection)\b", "", text)
+
+        # Collapse whitespace
         text = re.sub(r"\s+", " ", text)
         return text.strip()
 
@@ -545,8 +590,8 @@ def resolve_page_sync(topic_name: str) -> Optional[WikipediaPage]:
     """Resolve a topic name to a Wikipedia page via search + fetch.
 
     This is the primary entry point for the knowledge pipeline:
-      1. Try exact title lookup first (fast path)
-      2. Fall back to search + pick best match
+      1. Search Wikipedia for the topic name to get the canonical title
+      2. Fetch the full page with the canonical title
       3. Return WikipediaPage or None
 
     Args:
@@ -559,26 +604,30 @@ def resolve_page_sync(topic_name: str) -> Optional[WikipediaPage]:
     display = topic_name.replace("-", " ").strip()
     logger.debug("resolve_page_sync | topic=%s", topic_name)
 
-    # Fast path: try exact Wikipedia title format
-    exact_title = display.title()
-    page = get_page_sync(exact_title)
-    if page is not None:
+    # Fast path: try the display name as-is (preserve original case)
+    page = get_page_sync(display)
+    if page is not None and page.overview:
         return page
 
-    # Also try with underscores
-    alt_title = display.replace(" ", "_")
-    if alt_title != exact_title:
-        page = get_page_sync(alt_title)
-        if page is not None:
+    # Try with title case (first letter of each word capitalized)
+    title_case = display.title()
+    if title_case != display:
+        page = get_page_sync(title_case)
+        if page is not None and page.overview:
             return page
 
-    # Search path: find best match
+    # Try replacing spaces with underscores
+    underscored = display.replace(" ", "_")
+    page = get_page_sync(underscored)
+    if page is not None and page.overview:
+        return page
+
+    # Search path: find best match with canonical title
     results = search_sync(display, limit=3)
     if not results:
         logger.debug("resolve_page_sync miss | topic=%s no_results", topic_name)
         return None
 
-    # Pick best result and fetch the full page
     best = results[0]
     logger.debug("resolve_page_sync search_match | topic=%s -> %s (pageid=%d)",
                  topic_name, best.title, best.pageid)
@@ -698,9 +747,13 @@ def page_to_research_result(page: WikipediaPage) -> ResearchResult:
 def page_to_markdown(page: WikipediaPage) -> str:
     """Convert a WikipediaPage into structured markdown.
 
-    Produces a document with ## Overview, ## Key Concepts, and
-    ## Use Cases sections (if available). This mirrors the output
-    format of generate_library_content().
+    Produces a document with the article's Overview (lead section)
+    followed by the actual Wikipedia H2 sections — preserving the
+    article's native structure. Dynamic sections replace the old
+    rigid "Key Concepts" / "Use Cases" format.
+
+    Each section is truncated to ~600 chars (2-3 paragraphs) for
+    card tooltip display.
     """
     display = page.title.replace("_", " ").strip()
     lines = [f"# {display}", ""]
@@ -710,38 +763,84 @@ def page_to_markdown(page: WikipediaPage) -> str:
         lines.append(f"> {page.summary}")
         lines.append("")
 
-    # Overview (lead section)
+    # Overview (lead section — intro before any H2)
     if page.overview:
         lines.append("## Overview")
         lines.append("")
         lines.append(page.overview)
         lines.append("")
 
-    # Key Concepts (from H2 sections with actual text)
-    concepts = _extract_key_concepts(page)
-    if concepts:
-        lines.append("## Key Concepts")
-        lines.append("")
-        for kc in concepts:
-            desc = kc['description'].replace('\n', ' ').strip()
-            lines.append(f"- **{kc['name']}**: {desc}")
-        lines.append("")
-
-    # Use cases (best-effort)
-    use_cases = _extract_use_cases(page)
-    if use_cases:
-        lines.append("## Use Cases")
-        lines.append("")
-        for uc in use_cases:
-            lines.append(f"- **{uc['name']}**: {uc['description']}")
-        lines.append("")
+    # Dynamic sections: preserve Wikipedia's actual H2 structure.
+    # Uses the already-fetched section_texts from get_page().
+    _append_dynamic_sections(page, lines)
 
     # Attribution
     lines.append("## Source")
     lines.append("")
-    lines.append(f"*Sourced from Wikipedia — [{display}](https://en.wikipedia.org/wiki/{page.title.replace(' ', '_')})*")
+    lines.append(
+        f"*Sourced from Wikipedia — "
+        f"[{display}](https://en.wikipedia.org/wiki/{page.title.replace(' ', '_')})*"
+    )
 
     return "\n".join(lines)
+
+
+def _append_dynamic_sections(page: WikipediaPage, lines: list) -> None:
+    """Append Wikipedia H2 sections with their actual text to a markdown lines list.
+
+    Skips meta sections (See also, References, etc.) and truncates
+    long section bodies to a reasonable length for card tooltips.
+    """
+    skip_meta = {
+        "see also", "references", "notes",
+        "further reading", "external links",
+        "bibliography", "footnotes", "citation",
+        "sources", "source",
+    }
+
+    h2_sections = [
+        s for s in page.sections
+        if s.get("toclevel") == 1
+        and s.get("line", "").strip().lower() not in skip_meta
+    ]
+
+    # Also skip the "Overview" equivalent (first H2 whose text
+    # largely overlaps with the lead section we already rendered).
+    overview_words = set(page.overview.lower().split()[:50]) if page.overview else set()
+
+    for s in h2_sections:
+        title = s.get("line", "").strip()
+        if not title:
+            continue
+
+        section_text = page.section_texts.get(s.get("index", ""), "").strip()
+        if not section_text:
+            continue
+
+        # Skip if this section's text largely duplicates the overview
+        first_words = set(section_text.lower().split()[:50])
+        if overview_words and len(first_words & overview_words) > 20:
+            continue
+
+        # Truncate to first ~600 chars (2-3 paragraphs) for tooltip display.
+        # Split on double-newline to preserve paragraph boundaries.
+        paragraphs = section_text.split("\n\n")
+        truncated = ""
+        char_limit = 600
+        for para in paragraphs:
+            if len(truncated) + len(para) > char_limit:
+                # Add partial paragraph if we have room, then ellipsis
+                remaining = char_limit - len(truncated)
+                if remaining > 40:
+                    truncated += para[:remaining].rsplit(" ", 1)[0] + "..."
+                break
+            truncated += para + "\n\n"
+        truncated = truncated.rstrip()
+
+        lines.append(f"## {title}")
+        lines.append("")
+        lines.append(truncated)
+        lines.append("")
 
 
 def page_to_taxonomy(page: WikipediaPage) -> dict:

@@ -4,29 +4,26 @@ from sqlalchemy.orm import Session
 import asyncio
 import uuid
 import json
-from datetime import datetime, timezone
 
 from app.database import get_db, run_in_db
 from app.schemas.topic import (
     MapDataResponse, TopicResponse, TopicEdgeResponse, SuggestionResponse,
     TopicUpdateRequest, TopicCreateRequest, EdgeCreateRequest,
+    GapItem, GapDetectionResponse, ExploreConnectionRequest,
+    CommentRequest, CommentResponse,
 )
 from app.services import topic_service, brainstorm_service
 from app.services.map_suggestion_service import rebuild_map_suggestions
 from app.services.realtime_service import (
     publish_brainstorm_event, cache_map, get_cached_map, invalidate_map_cache,
 )
-from app.services.library_service import create_library_entry
 from app.services.gap_detection_service import detect_gaps
-from app.services.topic_enrichment_service import (
-    generate_library_content,
-    generate_topic_taxonomy,
-)
+from app.services.enrichment_service import enrich_from_wikipedia
 from app.services import map_service
+from app.services.map_service import persist_generated_content
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.sanitize import sanitize_topic_name, sanitize_topic_description
-from pydantic import BaseModel, Field
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,21 +67,6 @@ def refresh_propositions(brainstorm_id: uuid.UUID, db: Session = Depends(get_db)
 
     # Return updated map
     return map_service.build_map_response(db, brainstorm_id)
-
-
-class GapItem(BaseModel):
-    type: str
-    topic_id: str | None = None
-    topic_name: str | None = None
-    related_topic_id: str | None = None
-    related_topic_name: str | None = None
-    message: str
-    action: str
-
-
-class GapDetectionResponse(BaseModel):
-    gaps: list[GapItem]
-    total: int
 
 
 @router.get("/{brainstorm_id}/gaps", response_model=GapDetectionResponse)
@@ -223,43 +205,16 @@ def create_topic_manual(
                 weight=0.3,
             )
 
-        # Generate enriched library content via LLM
+        # Generate enriched library content from Wikipedia
         try:
             conv_text = map_service.get_conversation_text(db, brainstorm_id)
-            enriched = generate_library_content(
-                topic_name=topic_name,
-                conversation_text=conv_text if conv_text.strip() else topic_name,
-            )
-            taxonomy = generate_topic_taxonomy(
-                topic_name=topic_name,
-                library_content=enriched,
+            enrich_from_wikipedia(
+                db, brainstorm_id, topic, topic_name,
                 conversation_text=conv_text,
-            )
-            if taxonomy:
-                topic.taxonomy = taxonomy
-                from app.services.topic_research_service import taxonomy_to_markdown
-                taxonomy_md = taxonomy_to_markdown(taxonomy)
-                if taxonomy_md:
-                    enriched += "\n\n" + taxonomy_md
-
-            file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-            entry = create_library_entry(
-                db, brainstorm_id,
-                topic_id=topic.id,
-                folder_name=topic_name,
-                file_name=file_name,
-                content=enriched,
                 source_type="create",
             )
-            topic.library_path = entry.file_path
-            db.commit()
-            invalidate_map_cache(brainstorm_id)
-            db.refresh(topic)
         except Exception:
             pass  # Library entry is best-effort
-
-        # Refresh suggestions
-        rebuild_map_suggestions(db, brainstorm_id)
 
     publish_brainstorm_event("topic_created", brainstorm_id, {"topic_id": str(topic.id)})
     return topic
@@ -281,104 +236,20 @@ def explore_topic(
     if not topic or topic.brainstorm_id != brainstorm_id:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    # Generate structured library content via LLM
+    # Generate structured library content from Wikipedia
     conv_text = map_service.get_conversation_text(db, brainstorm_id)
-    enriched_content = generate_library_content(
-        topic_name=topic.name,
+    enrich_from_wikipedia(
+        db, brainstorm_id, topic, topic.name,
         conversation_text=conv_text,
-    )
-
-    # Append taxonomy sections (parent/child/related)
-    taxonomy = generate_topic_taxonomy(
-        topic_name=topic.name,
-        library_content=enriched_content,
-        conversation_text=conv_text,
-    )
-    if taxonomy:
-        topic.taxonomy = taxonomy
-        from app.services.topic_research_service import taxonomy_to_markdown
-        taxonomy_md = taxonomy_to_markdown(taxonomy)
-        if taxonomy_md:
-            enriched_content += "\n\n" + taxonomy_md
-
-    file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-    entry = create_library_entry(
-        db, brainstorm_id,
-        topic_id=topic.id,
-        folder_name=topic.name,
-        file_name=file_name,
-        content=enriched_content,
         source_type="explore",
     )
-    topic.library_path = entry.file_path
     topic.confidence = max(topic.confidence or 0.0, 0.7)
     db.commit()
-    invalidate_map_cache(brainstorm_id)
     db.refresh(topic)
-
-    # Rebuild suggestions
-    rebuild_map_suggestions(db, brainstorm_id)
     return map_service.build_map_response(db, brainstorm_id)
 
 
 # ─── Topic Content Generation (streaming) ─────────────────────
-
-
-def _persist_generated_content(
-    db: Session,
-    brainstorm_id: uuid.UUID,
-    topic_id: uuid.UUID,
-    topic_name: str,
-    full_response: str,
-) -> dict:
-    """Persist generated content to DB. Called via run_in_db from async context."""
-    # Parse summary: first line starting with "> " is the summary
-    lines = full_response.split("\n")
-    summary = ""
-    if lines and lines[0].startswith("> "):
-        summary = lines[0][2:].strip()
-
-    # Reload topic in the fresh session — must exist before we can create
-    # a library entry that references it (FK constraint).
-    topic = topic_service.get_topic(db, topic_id)
-    if topic is None:
-        raise RuntimeError(
-            f"Topic {topic_id} not found in database — it may have been "
-            "deleted between content generation and persistence."
-        )
-
-    if summary:
-        topic.description = summary
-    topic.outline = None
-    topic.confidence = max(topic.confidence or 0.0, 0.8)
-
-    # Create library entry
-    folder_name = topic_name
-    file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-    entry = create_library_entry(
-        db, brainstorm_id,
-        topic_id=topic_id,
-        folder_name=folder_name,
-        file_name=file_name,
-        content=full_response.strip(),
-        source_type="generate",
-    )
-    topic.library_path = entry.file_path
-
-    db.commit()
-    invalidate_map_cache(brainstorm_id)
-
-    # Rebuild suggestions
-    rebuild_map_suggestions(db, brainstorm_id, commit=True)
-
-    # Publish WebSocket event
-    publish_brainstorm_event(
-        "topic_generated",
-        brainstorm_id,
-        {"topic_id": str(topic_id), "library_entry_id": str(entry.id)},
-    )
-
-    return {"topic_id": str(topic_id), "summary": summary}
 
 
 @router.post("/{brainstorm_id}/topics/{topic_id}/generate")
@@ -441,7 +312,7 @@ def generate_topic_content(
         # Persist via thread-pool executor
         try:
             result = await run_in_db(
-                lambda db_session: _persist_generated_content(
+                lambda db_session: persist_generated_content(
                     db_session, brainstorm_id, topic_id, topic.name, full_response,
                 )
             )
@@ -466,19 +337,11 @@ def generate_topic_content(
 
 # ─── Edge Connection Exploration ──────────────────────────────
 
-# Prompt is defined in app.tasks.research_tasks (shared with Celery task)
 from app.tasks.research_tasks import (
     process_connection_exploration,
     process_connection_exploration_sync,
-    CONNECTION_PROMPT,
 )
-
-
-class ExploreConnectionRequest(BaseModel):
-    source_topic_id: uuid.UUID
-    target_topic_id: uuid.UUID
-    position_x: float = 0.0
-    position_y: float = 0.0
+from app.services.connection_exploration_service import CONNECTION_PROMPT
 
 
 @router.post("/{brainstorm_id}/explore-connection", status_code=202)
@@ -627,16 +490,6 @@ def delete_edge_manual(
 
 
 # ─── Topic Comments ──────────────────────────────────────────
-
-class CommentRequest(BaseModel):
-    content: str = Field(..., min_length=1, max_length=5000)
-
-
-class CommentResponse(BaseModel):
-    id: uuid.UUID
-    topic_id: uuid.UUID
-    content: str
-    created_at: datetime
 
 
 @router.get("/{brainstorm_id}/topics/{topic_id}/comments", response_model=list[CommentResponse])

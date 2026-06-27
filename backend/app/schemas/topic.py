@@ -92,3 +92,42 @@ class MapDataResponse(BaseModel):
     topics: List[TopicResponse]
     edges: List[TopicEdgeResponse]
     suggestions: List[SuggestionResponse] = []
+
+
+# ── Gap detection ────────────────────────────────────────────
+
+class GapItem(BaseModel):
+    type: str
+    topic_id: str | None = None
+    topic_name: str | None = None
+    related_topic_id: str | None = None
+    related_topic_name: str | None = None
+    message: str
+    action: str
+
+
+class GapDetectionResponse(BaseModel):
+    gaps: list[GapItem]
+    total: int
+
+
+# ── Connection exploration ───────────────────────────────────
+
+class ExploreConnectionRequest(BaseModel):
+    source_topic_id: uuid.UUID
+    target_topic_id: uuid.UUID
+    position_x: float = 0.0
+    position_y: float = 0.0
+
+
+# ── Topic comments ───────────────────────────────────────────
+
+class CommentRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
+class CommentResponse(BaseModel):
+    id: uuid.UUID
+    topic_id: uuid.UUID
+    content: str
+    created_at: datetime

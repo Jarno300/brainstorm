@@ -14,6 +14,7 @@ import useMapStore from './stores/mapStore';
 import { useAppOrchestrator } from './hooks/useAppOrchestrator';
 
 const SharedView = lazy(() => import('./features/share/SharedView'));
+const LandingPage = lazy(() => import('./features/landing'));
 
 const TopicDetailPanel = lazy(() => import('./features/canvas/TopicDetailPanel'));
 const SearchDialog = lazy(() => import('./features/search/SearchDialog'));
@@ -104,11 +105,11 @@ function AppContent() {
   );
 }
 
-// ─── AuthGate — routes unauthenticated users to login/register ──
+// ─── AuthGate — landing page for unauthenticated, app for authenticated ──
 
 function AuthGate() {
   const { token, loading } = useAuth();
-  const [authView, setAuthView] = useState('login');
+  const [authView, setAuthView] = useState(null);
 
   if (loading) {
     return (
@@ -121,12 +122,30 @@ function AuthGate() {
   if (token) return <AppContent />;
 
   return (
-    <ThemeProvider theme={createAppTheme('light', 'auburn')}>
-      <CssBaseline />
-      <Box sx={{ height: '100vh', bgcolor: 'background.default' }} />
-      <LoginDialog open={authView === 'login'} onSwitchToRegister={() => setAuthView('register')} />
-      <RegisterDialog open={authView === 'register'} onSwitchToLogin={() => setAuthView('login')} />
-    </ThemeProvider>
+    <>
+      <Suspense fallback={
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', bgcolor: '#1A1512' }}>
+          <CircularProgress size={32} sx={{ color: '#CA6F4E' }} />
+        </Box>
+      }>
+        <LandingPage
+          onGetStarted={() => setAuthView('register')}
+          onSignIn={() => setAuthView('login')}
+        />
+      </Suspense>
+      <ThemeProvider theme={createAppTheme('light', 'auburn')}>
+        <CssBaseline />
+        <Box sx={{ height: '100vh', bgcolor: 'background.default' }} />
+        <LoginDialog
+          open={authView === 'login'}
+          onSwitchToRegister={() => setAuthView('register')}
+        />
+        <RegisterDialog
+          open={authView === 'register'}
+          onSwitchToLogin={() => setAuthView('login')}
+        />
+      </ThemeProvider>
+    </>
   );
 }
 

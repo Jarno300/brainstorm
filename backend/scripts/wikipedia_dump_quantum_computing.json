@@ -1,0 +1,1192 @@
+{
+  "topic": "Quantum computing",
+  "endpoints": {
+    "search": {
+      "batchcomplete": "",
+      "continue": {
+        "sroffset": 5,
+        "continue": "-||"
+      },
+      "query": {
+        "searchinfo": {
+          "totalhits": 5981
+        },
+        "search": [
+          {
+            "ns": 0,
+            "title": "Quantum computing",
+            "pageid": 25220,
+            "size": 130257,
+            "wordcount": 13979,
+            "snippet": "neuromorphic <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span>. Both traditional <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span> and neuromorphic <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span> are physics-based unconventional <span class=\"searchmatch\">computing</span> approaches",
+            "timestamp": "2026-06-14T19:59:43Z"
+          },
+          {
+            "ns": 0,
+            "title": "Superconducting quantum computing",
+            "pageid": 1730328,
+            "size": 99180,
+            "wordcount": 10529,
+            "snippet": "<span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span> is a branch of <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span> and solid-state physics that implements superconducting electronic circuits as qubits in a <span class=\"searchmatch\">quantum</span>",
+            "timestamp": "2026-06-08T04:00:29Z"
+          },
+          {
+            "ns": 0,
+            "title": "Timeline of quantum computing and communication",
+            "pageid": 191911,
+            "size": 244487,
+            "wordcount": 23208,
+            "snippet": "timeline of <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span> and communication. Erwin Schrödinger publishes a theorem setting the basis for <span class=\"searchmatch\">quantum</span> steering and the limits of <span class=\"searchmatch\">quantum</span> state",
+            "timestamp": "2026-06-24T14:46:42Z"
+          },
+          {
+            "ns": 0,
+            "title": "Trapped-ion quantum computer",
+            "pageid": 2095183,
+            "size": 31611,
+            "wordcount": 3588,
+            "snippet": "<span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span> began to accelerate worldwide.[citation needed] In 2021, researchers from the University of Innsbruck presented a <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span>",
+            "timestamp": "2026-04-01T19:18:15Z"
+          },
+          {
+            "ns": 0,
+            "title": "Rigetti Computing",
+            "pageid": 54613107,
+            "size": 11897,
+            "wordcount": 1009,
+            "snippet": "authored more than 140 publications in the fields of <span class=\"searchmatch\">quantum</span> mechanics and <span class=\"searchmatch\">quantum</span> <span class=\"searchmatch\">computing</span>. Rigetti <span class=\"searchmatch\">Computing</span> received funding from startup incubator Y Combinator",
+            "timestamp": "2026-06-16T16:55:01Z"
+          }
+        ]
+      }
+    },
+    "intro_extract": {
+      "batchcomplete": "",
+      "query": {
+        "pages": {
+          "25220": {
+            "pageid": 25220,
+            "ns": 0,
+            "title": "Quantum computing",
+            "extract": "A quantum computer is a real or theoretical computer that exploits quantum phenomena like superposition and entanglement in an essential way. It is widely believed that a quantum computer could perform some calculations exponentially faster than any classical computer. For example, a large-scale quantum computer could break some widely used encryption schemes and aid physicists in performing physical simulations. However, current hardware implementations of quantum computation are largely experimental and only suitable for specialized tasks.\nThe basic unit of information in quantum computing, the qubit (or \"quantum bit\"), serves the same function as the bit in ordinary or \"classical\" computing. However, unlike a classical bit, which can be in one of two states (a binary), a qubit can exist in a linear combination of two states known as a quantum superposition. The result of measuring a qubit is one of the two states given by a probabilistic rule. If a quantum computer manipulates the qubit in a particular way, wave interference effects amplify the probability of the desired measurement result. The design of quantum algorithms involves creating procedures that allow a quantum computer to perform this amplification.\nQuantum computers are not yet practical for real-world applications. Physically engineering high-quality qubits has proven to be challenging. If a physical qubit is not sufficiently isolated from its environment, it suffers from quantum decoherence, introducing noise into calculations. National governments have invested heavily in experimental research aimed at developing scalable qubits with longer coherence times and lower error rates. Example implementations include superconductors (which isolate an electrical current by eliminating electrical resistance) and ion traps (which confine a single atomic particle using electromagnetic fields). Researchers have claimed, and are widely believed to be correct, that certain quantum devices can outperform classical computers on narrowly defined tasks, a milestone referred to as quantum advantage or quantum supremacy. These tasks are not necessarily useful for real-world applications. As a result, current demonstrations are best understood as scientific milestones rather than evidence of broad near-term deployment. In December 2024, Google's Willow chip achieved below-threshold error correction, a milestone 30 years in the making, while global government investment in quantum computing reached $10 billion by April 2025.\n\n"
+          }
+        }
+      }
+    },
+    "full_extract": {
+      "batchcomplete": "",
+      "query": {
+        "pages": {
+          "25220": {
+            "pageid": 25220,
+            "ns": 0,
+            "title": "Quantum computing",
+            "extract": "A quantum computer is a real or theoretical computer that exploits quantum phenomena like superposition and entanglement in an essential way. It is widely believed that a quantum computer could perform some calculations exponentially faster than any classical computer. For example, a large-scale quantum computer could break some widely used encryption schemes and aid physicists in performing physical simulations. However, current hardware implementations of quantum computation are largely experimental and only suitable for specialized tasks.\nThe basic unit of information in quantum computing, the qubit (or \"quantum bit\"), serves the same function as the bit in ordinary or \"classical\" computing. However, unlike a classical bit, which can be in one of two states (a binary), a qubit can exist in a linear combination of two states known as a quantum superposition. The result of measuring a qubit is one of the two states given by a probabilistic rule. If a quantum computer manipulates the qubit in a particular way, wave interference effects amplify the probability of the desired measurement result. The design of quantum algorithms involves creating procedures that allow a quantum computer to perform this amplification.\nQuantum computers are not yet practical for real-world applications. Physically engineering high-quality qubits has proven to be challenging. If a physical qubit is not sufficiently isolated from its environment, it suffers from quantum decoherence, introducing noise into calculations. National governments have invested heavily in experimental research aimed at developing scalable qubits with longer coherence times and lower error rates. Example implementations include superconductors (which isolate an electrical current by eliminating electrical resistance) and ion traps (which confine a single atomic particle using electromagnetic fields). Researchers have claimed, and are widely believed to be correct, that certain quantum devices can outperform classical computers on narrowly defined tasks, a milestone referred to as quantum advantage or quantum supremacy. These tasks are not necessarily useful for real-world applications. As a result, current demonstrations are best understood as scientific milestones rather than evidence of broad near-term deployment. In December 2024, Google's Willow chip achieved below-threshold error correction, a milestone 30 years in the making, while global government investment in quantum computing reached $10 billion by April 2025.\n\n\n== History ==\n\nFor many years, the fields of quantum mechanics and computer science formed distinct academic communities. Modern quantum theory was developed in the 1920s to explain perplexing physical phenomena observed at atomic scales, and digital computers emerged in the following decades to replace human computers for tedious calculations. Both disciplines had practical applications during World War II; computers played a major role in wartime cryptography, and quantum physics was essential for nuclear physics used in the Manhattan Project.\nAs physicists applied quantum mechanical models to computational problems and swapped digital bits for qubits, the fields of quantum mechanics and computer science began to converge. In 1980, Paul Benioff introduced the quantum Turing machine, which uses quantum theory to describe a simplified computer.\nWhen digital computers became faster, physicists faced an exponential increase in overhead when simulating quantum dynamics, prompting Yuri Manin and Richard Feynman to independently suggest that hardware based on quantum phenomena might be more efficient for computer simulation.\nIn a 1984 paper, Charles Bennett and Gilles Brassard applied quantum theory to cryptography protocols and demonstrated that quantum key distribution could enhance information security.\nQuantum algorithms then emerged for solving oracle problems, such as Deutsch's algorithm in 1985, the Bernstein–Vazirani algorithm in 1993, and Simon's algorithm in 1994.\nThese algorithms did not solve practical problems, but demonstrated mathematically that one could obtain more information by querying a black box with a quantum state in superposition, sometimes referred to as quantum parallelism.\n\nPeter Shor built on these results with his 1994 algorithm for breaking the widely used RSA and Diffie–Hellman encryption protocols, which drew significant attention to the field of quantum computing. In 1996, Grover's algorithm established a quantum speedup for the widely applicable unstructured search problem. The same year, Seth Lloyd proved that quantum computers could simulate quantum systems without the exponential overhead present in classical simulations, validating Feynman's 1982 conjecture.\nOver the years, experimentalists have constructed small-scale quantum computers using trapped ions and superconductors.\nIn 1998, a two-qubit quantum computer demonstrated the feasibility of the technology, and subsequent experiments have increased the number of qubits and reduced error rates.\nIn 2019, Google AI and NASA announced that they had achieved quantum supremacy with a 54-qubit machine, performing a computation that classical supercomputers would take an estimated 10,000 years to complete—a claim subsequently disputed by IBM, which argued the calculation could be done in approximately 2.5 days on its Summit supercomputer with optimized algorithms, sparking a debate over the precise threshold for this milestone.\nRecent milestones in quantum computing have increasingly focused on controlling decoherence through quantum error correction. In 2024, researchers demonstrated theoretical and practical approaches for high threshold, low-overhead fault-tolerant quantum memory. These developments represent a critical step toward scaling systems beyond the noisy intermediate-scale quantum (NISQ) era into reliable, fault-tolerant computing architectures, though large-scale physical implementation remains an ongoing engineering challenge.\n\n\n== Quantum information processing ==\nComputer engineers typically describe a modern computer's operation in terms of classical electrodynamics. In these \"classical\" computers, some components (such as semiconductors and random number generators) may rely on quantum behavior; however, because they are not isolated from their environment, any quantum information eventually quickly decoheres. While programmers may depend on probability theory when designing a randomized algorithm, quantum-mechanical notions such as superposition and wave interference are largely irrelevant in program analysis.\nThe \"classical\" in classical computation thus refers to the computational model, not to whether the microscopic physics of the hardware is ultimately quantum-mechanical. A conventional digital computer can be described by classical states and transition rules: memory stores bits, while logic elements transform one configuration of bits into another. This computational behavior is not tied to electronics, and can be abstracted through the idea of a Turing machine, a mechanical device that performs deterministic transformations on a finite state. In principle, the same classical transition rules can be implemented by some entirely classical mechanical device, possibly with a fixed slow-down in physical time. If a classical computation uses randomness, this can be modeled as access to random classical bits rather than as coherent quantum information. A quantum computer, by contrast, uses coherent quantum states, so that superposition, relative phase, and interference are part of the computation itself, and has no classical counterpart.\nQuantum programs instead rely on precise control of coherent quantum systems. Physicists describe these systems mathematically using linear algebra. Complex numbers model probability amplitudes, vectors model quantum states, and matrices model the operations that can be performed on these states. Programming a quantum computer is then a matter of composing operations in such a way that the resulting program computes a useful result in theory and is implementable in practice.\nPhysicist Charlie Bennett noted that since classical computers are composed of quantum atoms, one might study them from the opposite direction:\n\nA classical computer is a quantum computer ... so we shouldn't be asking about \"where do quantum speedups come from?\" We should say, \"Well, all computers are quantum. ... Where do classical slowdowns come from?\"\n\n\n=== Quantum information ===\nJust as the bit is the basic concept of classical information theory, the qubit is the fundamental unit of quantum information. The same term qubit is used to refer to an abstract mathematical model and to any physical system that is represented by that model. A classical bit, by definition, exists in either of two physical states, which can be denoted 0 and 1. A qubit is also described by a state, and two states, often written \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle }\n  \n and \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle }\n  \n, serve as the quantum counterparts of the classical states 0 and 1. However, the quantum states \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle }\n  \n and \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle }\n  \n belong to a vector space, meaning that they can be multiplied by constants and added together, and the result is again a valid quantum state. Such a combination is known as a superposition of \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle }\n  \n and \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle }\n  \n.\nA two-dimensional vector mathematically represents a qubit state. Physicists typically use bra–ket notation for quantum mechanical linear algebra, writing \n  \n    \n      \n        \n          |\n        \n        ψ\n        ⟩\n      \n    \n    {\\displaystyle |\\psi \\rangle }\n  \n 'ket psi' for a vector labeled \n  \n    \n      \n        ψ\n      \n    \n    {\\displaystyle \\psi }\n  \n. Because a qubit is a two-state system, any qubit state takes the form \n  \n    \n      \n        α\n        \n          |\n        \n        0\n        ⟩\n        +\n        β\n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle \\alpha |0\\rangle +\\beta |1\\rangle }\n  \n, where \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle }\n  \n and \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle }\n  \n are the standard basis states, and \n  \n    \n      \n        α\n      \n    \n    {\\displaystyle \\alpha }\n  \n and \n  \n    \n      \n        β\n      \n    \n    {\\displaystyle \\beta }\n  \n are the probability amplitudes, which are in general complex numbers. If either \n  \n    \n      \n        α\n      \n    \n    {\\displaystyle \\alpha }\n  \n or \n  \n    \n      \n        β\n      \n    \n    {\\displaystyle \\beta }\n  \n is zero, the qubit is effectively a classical bit; when both are nonzero, the qubit is in superposition. Such a quantum state vector behaves similarly to a (classical) probability vector, with one key difference: unlike probabilities, probability amplitudes are not necessarily positive numbers. Negative amplitudes allow for destructive wave interference.\nWhen a qubit is measured in the standard basis, the result is a classical bit. The Born rule describes the norm-squared correspondence between amplitudes and probabilities—when measuring a qubit \n  \n    \n      \n        α\n        \n          |\n        \n        0\n        ⟩\n        +\n        β\n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle \\alpha |0\\rangle +\\beta |1\\rangle }\n  \n, the state collapses to \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle }\n  \n with probability \n  \n    \n      \n        \n          |\n        \n        α\n        \n          \n            |\n          \n          \n            2\n          \n        \n      \n    \n    {\\displaystyle |\\alpha |^{2}}\n  \n, or to \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle }\n  \n with probability \n  \n    \n      \n        \n          |\n        \n        β\n        \n          \n            |\n          \n          \n            2\n          \n        \n      \n    \n    {\\displaystyle |\\beta |^{2}}\n  \n.\nAny valid qubit state has coefficients \n  \n    \n      \n        α\n      \n    \n    {\\displaystyle \\alpha }\n  \n and \n  \n    \n      \n        β\n      \n    \n    {\\displaystyle \\beta }\n  \n such that \n  \n    \n      \n        \n          |\n        \n        α\n        \n          \n            |\n          \n          \n            2\n          \n        \n        +\n        \n          |\n        \n        β\n        \n          \n            |\n          \n          \n            2\n          \n        \n        =\n        1\n      \n    \n    {\\displaystyle |\\alpha |^{2}+|\\beta |^{2}=1}\n  \n.\nAs an example, measuring the qubit \n  \n    \n      \n        1\n        \n          /\n        \n        \n          \n            2\n          \n        \n        \n          |\n        \n        0\n        ⟩\n        +\n        1\n        \n          /\n        \n        \n          \n            2\n          \n        \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle 1/{\\sqrt {2}}|0\\rangle +1/{\\sqrt {2}}|1\\rangle }\n  \n would produce either \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle }\n  \n or \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle }\n  \n with equal probability.\nTwo particularly important superposition states are the plus state \n  \n    \n      \n        \n          |\n        \n        +\n        ⟩\n        =\n        1\n        \n          /\n        \n        \n          \n            2\n          \n        \n        \n          |\n        \n        0\n        ⟩\n        +\n        1\n        \n          /\n        \n        \n          \n            2\n          \n        \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |+\\rangle =1/{\\sqrt {2}}|0\\rangle +1/{\\sqrt {2}}|1\\rangle }\n  \n and the minus state \n  \n    \n      \n        \n          |\n        \n        −\n        ⟩\n        =\n        1\n        \n          /\n        \n        \n          \n            2\n          \n        \n        \n          |\n        \n        0\n        ⟩\n        −\n        1\n        \n          /\n        \n        \n          \n            2\n          \n        \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle |-\\rangle =1/{\\sqrt {2}}|0\\rangle -1/{\\sqrt {2}}|1\\rangle }\n  \n. While both yield outcomes 0 and 1 with equal probability upon standard basis measurement, they behave differently under operations such as the Hadamard gate—which maps \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n        ↔\n        \n          |\n        \n        +\n        ⟩\n      \n    \n    {\\displaystyle |0\\rangle \\leftrightarrow |+\\rangle }\n  \n and \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n        ↔\n        \n          |\n        \n        −\n        ⟩\n      \n    \n    {\\displaystyle |1\\rangle \\leftrightarrow |-\\rangle }\n  \n—demonstrating that relative phase differences carry meaningful quantum information.\nEach additional qubit doubles the dimension of the state space.\nAs an example, the vector ⁠1/√2⁠|00⟩ + ⁠1/√2⁠|01⟩ represents a two-qubit state, a tensor product of the qubit |0⟩ with the qubit ⁠1/√2⁠|0⟩ + ⁠1/√2⁠|1⟩.\nThis vector inhabits a four-dimensional vector space spanned by the basis vectors |00⟩, |01⟩, |10⟩, and |11⟩.\nIn general, the vector space for an n-qubit system is 2n-dimensional, and this makes it challenging for a classical computer to simulate a quantum one: representing a 100-qubit system requires storing 2100 classical values.\n\n\n=== Unitary operators ===\n\nThe state of this one-qubit quantum memory can be manipulated by applying quantum logic gates, analogous to how classical memory can be manipulated with classical logic gates. One important gate for both classical and quantum computation is the NOT gate, which can be represented by a matrix\n\n  \n    \n      \n        X\n        :=\n        \n          \n            (\n            \n              \n                \n                  0\n                \n                \n                  1\n                \n              \n              \n                \n                  1\n                \n                \n                  0\n                \n              \n            \n            )\n          \n        \n        .\n      \n    \n    {\\displaystyle X:={\\begin{pmatrix}0&1\\\\1&0\\end{pmatrix}}.}\n  \n\nMathematically, the application of such a logic gate to a quantum state vector is modeled with matrix multiplication. Thus\n\n  \n    \n      \n        X\n        \n          |\n        \n        0\n        ⟩\n        =\n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\displaystyle X|0\\rangle =|1\\rangle }\n  \n and \n  \n    \n      \n        X\n        \n          |\n        \n        1\n        ⟩\n        =\n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\displaystyle X|1\\rangle =|0\\rangle }\n  \n.\nThe mathematics of single-qubit gates can be extended to operate on multi-qubit quantum memories in two important ways. One way is simply to select a qubit and apply that gate to the target qubit while leaving the remainder of the memory unaffected. Another way is to apply the gate to its target only if another part of the memory is in a desired state. These two choices can be illustrated using another example. The possible states of a two-qubit quantum memory are\n\n  \n    \n      \n        \n          |\n        \n        00\n        ⟩\n        :=\n        \n          \n            (\n            \n              \n                \n                  1\n                \n              \n              \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n              \n            \n            )\n          \n        \n        ;\n        \n        \n          |\n        \n        01\n        ⟩\n        :=\n        \n          \n            (\n            \n              \n                \n                  0\n                \n              \n              \n                \n                  1\n                \n              \n              \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n              \n            \n            )\n          \n        \n        ;\n        \n        \n          |\n        \n        10\n        ⟩\n        :=\n        \n          \n            (\n            \n              \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n              \n              \n                \n                  1\n                \n              \n              \n                \n                  0\n                \n              \n            \n            )\n          \n        \n        ;\n        \n        \n          |\n        \n        11\n        ⟩\n        :=\n        \n          \n            (\n            \n              \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n              \n              \n                \n                  1\n                \n              \n            \n            )\n          \n        \n        .\n      \n    \n    {\\displaystyle |00\\rangle :={\\begin{pmatrix}1\\\\0\\\\0\\\\0\\end{pmatrix}};\\quad |01\\rangle :={\\begin{pmatrix}0\\\\1\\\\0\\\\0\\end{pmatrix}};\\quad |10\\rangle :={\\begin{pmatrix}0\\\\0\\\\1\\\\0\\end{pmatrix}};\\quad |11\\rangle :={\\begin{pmatrix}0\\\\0\\\\0\\\\1\\end{pmatrix}}.}\n  \n\nThe controlled NOT (CNOT) gate can then be represented using the following matrix:\n\n  \n    \n      \n        CNOT\n        :=\n        \n          \n            (\n            \n              \n                \n                  1\n                \n                \n                  0\n                \n                \n                  0\n                \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n                \n                  1\n                \n                \n                  0\n                \n                \n                  0\n                \n              \n              \n                \n                  0\n                \n                \n                  0\n                \n                \n                  0\n                \n                \n                  1\n                \n              \n              \n                \n                  0\n                \n                \n                  0\n                \n                \n                  1\n                \n                \n                  0\n                \n              \n            \n            )\n          \n        \n        .\n      \n    \n    {\\displaystyle \\operatorname {CNOT} :={\\begin{pmatrix}1&0&0&0\\\\0&1&0&0\\\\0&0&0&1\\\\0&0&1&0\\end{pmatrix}}.}\n  \n\nAs a mathematical consequence of this definition, \n  \n    \n      \n        CNOT\n        ⁡\n        \n          |\n        \n        00\n        ⟩\n        =\n        \n          |\n        \n        00\n        ⟩\n      \n    \n    {\\textstyle \\operatorname {CNOT} |00\\rangle =|00\\rangle }\n  \n, \n  \n    \n      \n        CNOT\n        ⁡\n        \n          |\n        \n        01\n        ⟩\n        =\n        \n          |\n        \n        01\n        ⟩\n      \n    \n    {\\textstyle \\operatorname {CNOT} |01\\rangle =|01\\rangle }\n  \n, \n  \n    \n      \n        CNOT\n        ⁡\n        \n          |\n        \n        10\n        ⟩\n        =\n        \n          |\n        \n        11\n        ⟩\n      \n    \n    {\\textstyle \\operatorname {CNOT} |10\\rangle =|11\\rangle }\n  \n, and \n  \n    \n      \n        CNOT\n        ⁡\n        \n          |\n        \n        11\n        ⟩\n        =\n        \n          |\n        \n        10\n        ⟩\n      \n    \n    {\\textstyle \\operatorname {CNOT} |11\\rangle =|10\\rangle }\n  \n. In other words, the CNOT applies a NOT gate (\n  \n    \n      \n        X\n      \n    \n    {\\textstyle X}\n  \n from before) to the second qubit if and only if the first qubit is in the state \n  \n    \n      \n        \n          |\n        \n        1\n        ⟩\n      \n    \n    {\\textstyle |1\\rangle }\n  \n. If the first qubit is \n  \n    \n      \n        \n          |\n        \n        0\n        ⟩\n      \n    \n    {\\textstyle |0\\rangle }\n  \n, nothing is done to either qubit.\nIn summary, quantum computation can be described as a network of quantum logic gates and measurements. However, any measurement can be deferred to the end of quantum computation, though this deferment may come at a computational cost, so most quantum circuits depict a network consisting only of quantum logic gates and no measurements.\n\n\n=== Quantum parallelism ===\nQuantum parallelism is the heuristic that quantum computers can be thought of as evaluating a function for multiple input values simultaneously. This can be achieved by preparing a quantum system in a superposition of input states and applying a unitary transformation that encodes the function to be evaluated. The resulting state encodes the function's output values for all input values in the superposition, enabling the simultaneous computation of multiple outputs. This property is key to the speedup of many quantum algorithms. However, \"parallelism\" in this sense is insufficient to speed up a computation, because the measurement at the end of the computation gives only one value. To be useful, a quantum algorithm must also incorporate some other conceptual ingredient.\n\n\n=== Quantum programming ===\n\nThere are multiple models of computation for quantum computing, distinguished by the basic elements in which the computation is decomposed.\n\n\n==== Gate array ====\n\nA quantum gate array decomposes computation into a sequence of few-qubit quantum gates. A quantum computation can be described as a network of quantum logic gates and measurements. However, any measurement can be deferred to the end of quantum computation, though this deferment may come at a computational cost, so most quantum circuits depict a network consisting only of quantum logic gates and no measurements.\nAny quantum computation (which is, in the above formalism, any unitary matrix of size \n  \n    \n      \n        \n          2\n          \n            n\n          \n        \n        ×\n        \n          2\n          \n            n\n          \n        \n      \n    \n    {\\displaystyle 2^{n}\\times 2^{n}}\n  \n over \n  \n    \n      \n        n\n      \n    \n    {\\displaystyle n}\n  \n qubits) can be represented as a network of quantum logic gates from a fairly small family of gates. A choice of gate family that enables this construction is known as a universal gate set, since a computer that can run such circuits is a universal quantum computer. One common such set includes all single-qubit gates as well as the CNOT gate from above. This means any quantum computation can be performed by executing a sequence of single-qubit gates together with CNOT gates. Though this gate set is infinite, it can be replaced with a finite gate set by appealing to the Solovay-Kitaev theorem. Implementation of Boolean functions using the few-qubit quantum gates is presented here.\n\n\n==== Measurement-based quantum computing ====\nA measurement-based quantum computer decomposes computation into a sequence of Bell state measurements and single-qubit quantum gates applied to a highly entangled initial state (a cluster state), using a technique called quantum gate teleportation.\n\n\n==== Adiabatic quantum computing ====\nAn adiabatic quantum computer, based on quantum annealing, decomposes computation into a slow continuous transformation of an initial Hamiltonian into a final Hamiltonian, whose ground states contain the solution.\n\n\n==== Neuromorphic quantum computing ====\nNeuromorphic quantum computing (abbreviated 'n.quantum computing') is an unconventional process of computing that uses neuromorphic computing to perform quantum operations. It was suggested that quantum algorithms, which are algorithms that run on a realistic model of quantum computation, can be computed equally efficiently with neuromorphic quantum computing. Both traditional quantum computing and neuromorphic quantum computing are physics-based unconventional computing approaches to computations and do not follow the von Neumann architecture. They both construct a system (a circuit) that represents the physical problem at hand and then leverage their respective physics properties of the system to seek the \"minimum\". Neuromorphic quantum computing and quantum computing share similar physical properties during computation.\n\n\n==== Topological quantum computing ====\nA topological quantum computer decomposes computation into the braiding of anyons in a 2D lattice.\n\n\n==== Quantum Turing machine ====\nA quantum Turing machine is the quantum analog of a Turing machine. All of these models of computation—quantum circuits, one-way quantum computation, adiabatic quantum computation, and topological quantum computation—have been shown to be equivalent to the quantum Turing machine; given a perfect implementation of one such quantum computer, it can simulate all the others with no more than polynomial overhead. This equivalence need not hold for practical quantum computers, since the overhead of simulation may be too large to be practical.\n\n\n==== Noisy intermediate-scale quantum computing ====\nThe threshold theorem shows how increasing the number of qubits can mitigate errors, yet fully fault-tolerant quantum computing remains \"a rather distant dream\". According to some researchers, noisy intermediate-scale quantum (NISQ) machines may have specialized uses in the near future, but noise in quantum gates limits their reliability.\nScientists at Harvard University successfully created \"quantum circuits\" that correct errors more efficiently than alternative methods, which may potentially remove a major obstacle to practical quantum computers. The Harvard research team was supported by MIT, QuEra Computing, Caltech, and Princeton University and funded by DARPA's Optimization with Noisy Intermediate-Scale Quantum devices (ONISQ) program.\n\n\n==== Quantum cryptography and cybersecurity ====\n\nDigital cryptography enables communications to remain private, preventing unauthorized parties from accessing them. Conventional encryption, the obscuring of a message with a key through an algorithm, relies on the algorithm being difficult to reverse. Encryption is also the basis for digital signatures and authentication mechanisms. Quantum computing may be sufficiently more powerful that difficult reversals are feasible, allowing messages relying on conventional encryption to be read.\nQuantum cryptography replaces conventional algorithms with computations based on quantum computing. In principle, quantum encryption would be impossible to decode even with a quantum computer. This advantage comes at a significant cost in terms of elaborate infrastructure, while effectively preventing legitimate decoding of messages by governmental security officials.\nOngoing research in quantum and post-quantum cryptography has led to new algorithms for quantum key distribution, initial work on quantum random number generation and to some early technology demonstrations.\n\n\n== Communication ==\n\nQuantum cryptography enables new ways to transmit data securely; for example, quantum key distribution uses entangled quantum states to establish secure cryptographic keys. When a sender and receiver exchange quantum states, they can guarantee that an adversary does not intercept the message, as any unauthorized eavesdropper would disturb the delicate quantum system and introduce a detectable change. With appropriate cryptographic protocols, the sender and receiver can thus establish shared private information resistant to eavesdropping.\nModern fiber-optic cables can transmit quantum information over relatively short distances. Ongoing experimental research aims to develop more reliable hardware (such as quantum repeaters), hoping to scale this technology to long-distance quantum networks with end-to-end entanglement. Theoretically, this could enable novel technological applications, such as distributed quantum computing and enhanced quantum sensing.\n\n\n=== Quantum communication protocols ===\nQuantum teleportation is a protocol by which Alice can transmit the quantum state of a qubit to Bob using one shared entangled pair (e-bit) and two classical bits of communication. The state of Alice's qubit is not physically transmitted—instead, it is reconstructed at Bob's end through classically communicated measurement outcomes and local unitary corrections. This demonstrates that quantum communication requires both entanglement and classical communication; neither alone is sufficient. Teleportation cannot be used to transmit information faster than light because the classical bits must travel through normal channels.\nSuperdense coding is the complementary protocol: using one shared e-bit and sending only one qubit, Alice can transmit two classical bits to Bob. This appears to violate Holevo's theorem—which states that a single qubit can carry at most one bit of classical information—but the shared entanglement circumvents this limit. Superdense coding thus demonstrates that entanglement can effectively double the classical information-carrying capacity of quantum communication.\n\n\n== Algorithms ==\n\nProgress in finding quantum algorithms typically focuses on the quantum circuit model, though exceptions like the quantum adiabatic algorithm exist. Quantum algorithms can be roughly categorized by the type of speedup achieved over corresponding classical algorithms.\nQuantum algorithms that offer more than a polynomial speedup over the best-known classical algorithm include Shor's algorithm for factoring and the related quantum algorithms for computing discrete logarithms, solving Pell's equation, and, more generally, solving the hidden subgroup problem for abelian finite groups. These algorithms depend on the primitive of the quantum Fourier transform. No mathematical proof has been found that shows that an equally fast classical algorithm cannot be discovered, but evidence suggests that this is unlikely. Certain oracle problems like Simon's problem and the Bernstein–Vazirani problem do give provable speedups, though this is in the quantum query model, which is a restricted model where lower bounds are much easier to prove and don't necessarily translate to speedups for practical problems.\nOther problems, including the simulation of quantum physical processes from chemistry and solid-state physics, the approximation of certain Jones polynomials, and the quantum algorithm for linear systems of equations, have quantum algorithms appearing to give super-polynomial speedups and are BQP-complete. Because these problems are BQP-complete, an equally fast classical algorithm for them would imply that \"no quantum algorithm\" provides a super-polynomial speedup, which is believed to be unlikely.\nIn addition to these problems, quantum algorithms are being explored for applications in cryptography, optimization, and machine learning, although most of these remain at the research stage and require significant advances in error correction and hardware scalability before practical implementation.\nSome quantum algorithms, such as Grover's algorithm and amplitude amplification, give polynomial speedups over corresponding classical algorithms. Though these algorithms give comparably modest quadratic speedup, they are widely applicable and thus give speedups for a wide range of problems. These speed-ups are, however, over the theoretical worst-case of classical algorithms, and concrete real-world speed-ups over algorithms used in practice have not been demonstrated.\n\n\n=== Simulation of quantum systems ===\n\nSince chemistry and nanotechnology rely on understanding quantum systems, and such systems are impossible to simulate in an efficient manner classically, quantum simulation may be an important application of quantum computing. Recent reviews identify quantum chemistry as one of the most promising application areas for quantum computing, particularly for problems in electronic structure, chemical dynamics, and spectroscopy, while noting that useful implementations remain limited by current hardware. Quantum simulation could also be used to simulate the behavior of atoms and particles at unusual conditions such as the reactions inside a collider. In June 2023, IBM computer scientists reported that a quantum computer produced better results for a physics problem than a conventional supercomputer.\nAbout 2% of the annual global energy output is used for nitrogen fixation to produce ammonia for the Haber process in the agricultural fertiliser industry (even though naturally occurring organisms also produce ammonia). Quantum simulations might be used to understand this process and increase the energy efficiency of production. It is expected that an early use of quantum computing will be modeling that improves the efficiency of the Haber–Bosch process by the mid-2020s although some have predicted it will take longer.\n\n\n=== Post-quantum cryptography ===\n\nA notable application of quantum computing is in attacking cryptographic systems that are currently in use. Integer factorization, which underpins the security of public key cryptographic systems, is believed to be computationally infeasible on a classical computer for large integers if they are the product of a few prime numbers (e.g., the product of two 300-digit primes). By contrast, a quantum computer could solve this problem exponentially faster using Shor's algorithm to factor the integer. This ability would allow a quantum computer to break many of the cryptographic systems in use today, in the sense that there would be a polynomial time (in the number of digits of the integer) algorithm for solving the problem. In particular, most of the popular public key ciphers are based on the difficulty of factoring integers or the discrete logarithm problem, both of which can be solved by Shor's algorithm. In particular, the RSA, Diffie–Hellman, and elliptic curve Diffie–Hellman algorithms could be broken. These are used to protect secure Web pages, encrypted email, and many other types of data. Breaking these would have significant ramifications for electronic privacy and security.\nIdentifying cryptographic systems that may be secure against quantum algorithms is an actively researched topic under the field of post-quantum cryptography. Some public-key algorithms are based on problems other than the integer factorization and discrete logarithm problems to which Shor's algorithm applies, such as the McEliece cryptosystem, which relies on a hard problem in coding theory. Lattice-based cryptosystems are also not known to be broken by quantum computers, and finding a polynomial time algorithm for solving the dihedral hidden subgroup problem, which would break many lattice-based cryptosystems, is a well-studied open problem. It has been shown that applying Grover's algorithm to break a symmetric (secret-key) algorithm by brute force requires time equal to roughly 2n/2 invocations of the underlying cryptographic algorithm, compared with roughly 2n in the classical case, meaning that symmetric key lengths are effectively halved: AES-256 would have comparable security against an attack using Grover's algorithm to that AES-128 has against classical brute-force search (see Key size).\n\n\n=== Search problems ===\n\nThe most well-known example of a problem that allows for a polynomial quantum speedup is unstructured search, which involves finding a marked item out of a list of \n  \n    \n      \n        n\n      \n    \n    {\\displaystyle n}\n  \n items in a database. This can be solved by Grover's algorithm using \n  \n    \n      \n        O\n        (\n        \n          \n            n\n          \n        \n        )\n      \n    \n    {\\displaystyle O({\\sqrt {n}})}\n  \n queries to the database, quadratically fewer than the \n  \n    \n      \n        Ω\n        (\n        n\n        )\n      \n    \n    {\\displaystyle \\Omega (n)}\n  \n queries required for classical algorithms. In this case, the advantage is not only provable but also optimal: it has been shown that Grover's algorithm gives the maximal possible probability of finding the desired element for any number of oracle lookups. Many examples of provable quantum speedups for query problems are based on Grover's algorithm, including Brassard, Høyer, and Tapp's algorithm for finding collisions in two-to-one functions, and Farhi, Goldstone, and Gutmann's algorithm for evaluating NAND trees.\nProblems that can be efficiently addressed with Grover's algorithm have the following properties:\n\nThere is no searchable structure in the collection of possible answers,\nThe number of possible answers to check is the same as the number of inputs to the algorithm, and\nThere exists a Boolean function that evaluates each input and determines whether it is the correct answer.\nFor problems with all these properties, the running time of Grover's algorithm on a quantum computer scales as the square root of the number of inputs (or elements in the database), as opposed to the linear scaling of classical algorithms. A general class of problems to which Grover's algorithm can be applied is a Boolean satisfiability problem, where the database through which the algorithm iterates is that of all possible answers. An example and possible application of this is a password cracker that attempts to guess a password. Breaking symmetric ciphers with this algorithm is of interest to government agencies.\n\n\n=== Quantum annealing ===\nQuantum annealing uses the adiabatic theorem to perform calculations. A system is placed in the ground state for a simple Hamiltonian, which slowly evolves to a more complicated Hamiltonian whose ground state represents the solution to the problem in question. The adiabatic theorem states that if the evolution is slow enough, the system will stay in its ground state at all times through the process. Quantum annealing can solve Ising models and the (computationally equivalent) QUBO problem, which in turn can be used to encode a wide range of combinatorial optimization problems. Adiabatic optimization may be helpful for solving computational biology problems.\n\n\n=== Machine learning ===\n\nSince quantum computers can produce outputs that classical computers cannot produce efficiently, and since quantum computation is fundamentally linear algebraic, some express hope in developing quantum algorithms that can speed up machine learning tasks.\nHowever, review literature notes that many proposed quantum machine-learning advantages rely on assumptions about efficient data encoding or continued access to quantum hardware, and have not yet translated into broad practical end-to-end advantage on current devices.\nFor example, the HHL Algorithm, named after its discoverers Harrow, Hassidim, and Lloyd, is believed to provide speedup over classical counterparts. Some research groups have recently explored the use of quantum annealing hardware for training Boltzmann machines and deep neural networks.\n\nDeep generative chemistry models have been explored for potential applications in drug discovery. Early experimental work has explored the use of near-term quantum hardware in molecular generative modeling for drug discovery. In 2023, researchers at Gero reported a hybrid quantum–classical generative model based on a restricted Boltzmann machine, implemented on a commercially available quantum annealing device, to generate novel drug-like small molecules with physicochemical properties comparable to known medicinal compounds. However, the immense size and complexity of the structural space of all possible drug-like molecules pose significant obstacles, which could be overcome in the future by quantum computers. Quantum computers are naturally good for solving complex quantum many-body problems and thus may be instrumental in applications involving quantum chemistry. Therefore, one can expect that quantum-enhanced generative models including quantum GANs may eventually be developed into ultimate generative chemistry algorithms.\n\n\n=== AI-assisted algorithm discovery ===\nArtificial intelligence has also been explored as a tool for discovering and optimizing algorithms relevant to quantum computing. AlphaEvolve, a Google DeepMind system based on large language models and evolutionary algorithms, has been described as a coding agent for scientific and algorithmic discovery. In quantum-computing research, AlphaEvolve-optimized quantum circuits have been used in work on quantum computation of molecular geometry through many-body nuclear spin echoes.\n\n\n== Engineering ==\nAs of 2023, classical computers outperform quantum computers for all real-world applications. While current quantum computers may speed up solutions to particular mathematical problems, they give no computational advantage for practical tasks. Scientists and engineers are exploring multiple technologies for quantum computing hardware and hope to develop scalable quantum architectures, but serious obstacles remain. In practice, improvements in qubit counts alone are not enough, because error rates, connectivity, and data movement also affect whether an end-to-end application can outperform classical methods.\n\n\n=== Challenges ===\nThere are a number of technical challenges in building a large-scale quantum computer. Physicist David DiVincenzo has listed these requirements for a practical quantum computer:\n\nPhysically scalable to increase the number of qubits\nQubits that can be initialized to arbitrary values\nQuantum gates that are faster than decoherence time\nUniversal gate set\nQubits that can be read easily.\nThe control of multi-qubit systems requires the generation and coordination of a large number of electrical signals with tight and deterministic timing resolution. This has led to the development of quantum controllers that enable interfacing with the qubits. Scaling these systems to support a growing number of qubits is an additional challenge.\nThe theoretical potential for large-scale quantum computers to eventually break widely used public-key encryption schemes has prompted significant motivated changes in global cybersecurity strategies. In response to this future challenge, organizations, including the National Institute of Standards and Technology (NIST), have initiated detailed standardization processes for post-quantum cryptography. These global efforts are designed to develop, evaluate, and deploy cryptographic algorithms that remain safe against both quantum and classical computer attacks, well before fully fault-tolerant quantum systems become available.\n\n\n==== Coolant ====\nSourcing parts for quantum computers is also very difficult. Superconducting quantum computers, like those constructed by Google and IBM, need helium-3, a nuclear research byproduct, and special superconducting cables made only by the Japanese company Coax Co. On 27 January 2026, the US DARPA agency made a call for proposals for a quantum computing coolant below 1 kelvin, which does not use helium-3. In February 2026, the Chinese Academy of Sciences announced the testing of a rare-earth alloy, EuCo2Al9, which could fill a similar role.\n\n\n==== Decoherence ====\nOne of the greatest challenges involved in constructing quantum computers is controlling or removing quantum decoherence. This usually means isolating the system from its environment, as interactions with the external world cause the system to decohere. However, other sources of decoherence also exist. Examples include the quantum gates, the lattice vibrations, and the background thermonuclear spin of the physical system used to implement the qubits. Decoherence is irreversible, as it is effectively non-unitary, and is usually something that should be highly controlled, if not avoided. Decoherence times for candidate systems in particular, the transverse relaxation time T2 (for NMR and MRI technology, also called the dephasing time), typically range between nanoseconds and seconds at low temperatures. Currently, some quantum computers require their qubits to be cooled to 20 millikelvin (usually using a dilution refrigerator) in order to prevent significant decoherence. A 2020 study argues that ionizing radiation such as cosmic rays can nevertheless cause certain systems to decohere within milliseconds.\nAs a result, time-consuming tasks may render some quantum algorithms inoperable, as attempting to maintain the state of qubits for a long enough duration will eventually corrupt the superpositions.\nThese issues are more difficult for optical approaches as the timescales are orders of magnitude shorter, and an often-cited approach to overcoming them is optical pulse shaping. Error rates are typically proportional to the ratio of operating time to decoherence time; hence, any operation must be completed much more quickly than the decoherence time.\nAs described by the threshold theorem, if the error rate is small enough, it is thought to be possible to use quantum error correction to suppress errors and decoherence. This allows the total calculation time to be longer than the decoherence time if the error correction scheme can correct errors faster than decoherence introduces them. An often-cited figure for the required error rate in each gate for fault-tolerant computation is 10−3, assuming the noise is depolarizing.\nMeeting this scalability condition is possible for a wide range of systems. However, the use of error correction brings with it the cost of a greatly increased number of required qubits. The number required to factor integers using Shor's algorithm is still polynomial, and thought to be between L and L2, where L is the number of binary digits in the number to be factored; error correction algorithms would inflate this figure by an additional factor of L. For a 1000-bit number, this implies a need for about 104 bits without error correction. With error correction, the figure would rise to about 107 bits. Computation time is about L2 or about 107 steps and at 1 MHz, about 10 seconds. However, the encoding and error-correction overheads increase the size of a real fault-tolerant quantum computer by several orders of magnitude. Careful estimates show that at least 3 million physical qubits would factor 2,048-bit integer in 5 months on a fully error-corrected trapped-ion quantum computer. In terms of the number of physical qubits, to date, this remains the lowest estimate for practically useful integer factorization problem sizing 1,024-bit or larger. \nOne approach to overcoming errors combines low-density parity-check code with cat qubits that have intrinsic bit-flip error suppression. Implementing 100 logical qubits with 768 cat qubits could reduce the error rate to one part in 108 per cycle per bit.\nAnother approach to the stability-decoherence problem is to create a topological quantum computer with anyons, quasi-particles used as threads, and relying on braid theory to form stable logic gates. Non-Abelian anyons can, in effect, remember how they have been manipulated, making them potentially useful in quantum computing. As of 2025, Microsoft and other organizations are investing in quasi-particle research.\n\n\n=== Quantum supremacy ===\nPhysicist John Preskill coined the term quantum supremacy to describe the engineering feat of demonstrating that a programmable quantum device can solve a problem beyond the capabilities of state-of-the-art classical computers. The problem need not be useful, so some view the quantum supremacy test only as a potential future benchmark.\nIn October 2019, Google AI Quantum, with the help of NASA, became the first to claim to have achieved quantum supremacy by performing calculations on the Sycamore quantum computer more than 3,000,000 times faster than they could be done on Summit, generally considered the world's fastest computer. This claim has been subsequently challenged: IBM has stated that Summit can perform samples much faster than claimed, and researchers have since developed better algorithms for the sampling problem used to claim quantum supremacy, giving substantial reductions to the gap between Sycamore and classical supercomputers and even beating it.\nIn December 2020, a group at USTC implemented a type of boson sampling on 76 photons with a photonic quantum computer, Jiuzhang, to demonstrate quantum supremacy. The authors claim that a classical contemporary supercomputer would require a computational time of 600 million years to generate the number of samples their quantum processor can generate in 20 seconds.\nClaims of quantum supremacy have generated hype around quantum computing, but they are based on contrived benchmark tasks that do not directly imply useful real-world applications. Accordingly, benchmark-level quantum advantage should not be interpreted as proof that quantum computers are already broadly useful across practical computing workloads.\nIn January 2024, a study published in Physical Review Letters provided direct verification of quantum supremacy experiments by computing exact amplitudes for experimentally generated bitstrings using a new-generation Sunway supercomputer, demonstrating a significant leap in simulation capability built on a multiple-amplitude tensor network contraction algorithm.\n\n\n=== Skepticism ===\nDespite high hopes for quantum computing, significant progress in hardware, and optimism about future applications, a 2023 Nature spotlight article summarized current quantum computers as being \"For now, [good for] absolutely nothing\". The article elaborated that quantum computers are yet to be more useful or efficient than conventional computers in any case, though it also argued that, in the long term, such computers are likely to be useful. A 2023 Communications of the ACM article found that current quantum computing algorithms are \"insufficient for practical quantum advantage without significant improvements across the software/hardware stack\". It argues that the most promising candidates for achieving speedup with quantum computers are \"small-data problems\", for example, in chemistry and materials science. However, the article also concludes that a large range of the potential applications it considered, such as machine learning, \"will not achieve quantum advantage with current quantum algorithms in the foreseeable future\", and it identified I/O constraints that make speedup unlikely for \"big data problems, unstructured linear systems, and database search based on Grover's algorithm\".\nThis state of affairs can be traced to several current and long-term considerations.\n\nConventional computer hardware and algorithms are not only optimized for practical tasks, but are still improving rapidly, particularly GPU accelerators.\nCurrent quantum computing hardware generates only a limited amount of entanglement before getting overwhelmed by noise.\nQuantum algorithms provide speedup over conventional algorithms only for some tasks, and matching these tasks with practical applications proved challenging. Some promising tasks and applications require resources far beyond those available today. In particular, processing large amounts of non-quantum data is a challenge for quantum computers.\nSome promising algorithms have been \"dequantized\", i.e., their non-quantum analogues with similar complexity have been found.\nIf quantum error correction is used to scale quantum computers to practical applications, its overhead may undermine the speedup offered by many quantum algorithms.\nComplexity analysis of algorithms sometimes makes abstract assumptions that do not hold in applications. For example, input data may not already be available encoded in quantum states, and \"oracle functions\" used in Grover's algorithm often have internal structure that can be exploited for faster algorithms.\nIn particular, building computers with large numbers of qubits may be futile if those qubits are not connected well enough and cannot maintain a sufficiently high degree of entanglement for a long time. When trying to outperform conventional computers, quantum computing researchers often look for new tasks that can be solved on quantum computers, but this leaves the possibility that efficient non-quantum techniques will be developed in response, as seen for Quantum supremacy demonstrations. Therefore, it is desirable to prove lower bounds on the complexity of best possible non-quantum algorithms (which may be unknown) and show that some quantum algorithms asymptotically improve upon those bounds.\nBill Unruh doubted the practicality of quantum computers in a paper published in 1994. Paul Davies argued that a 400-qubit computer would even come into conflict with the cosmological information bound implied by the holographic principle. Skeptics like Gil Kalai doubt that quantum supremacy will ever be achieved. Physicist Mikhail Dyakonov has expressed skepticism of quantum computing as follows:\n\n\"So the number of continuous parameters describing the state of such a useful quantum computer at any given moment must be... about 10300... Could we ever learn to control the more than 10300 continuously variable parameters defining the quantum state of such a system? My answer is simple. No, never.\"\n\n\n=== Physical realizations ===\n\nA practical quantum computer must use a physical system as a programmable quantum register. Researchers are exploring several technologies as candidates for reliable qubit implementations. Superconductors and trapped ions are some of the most developed proposals, but experimentalists are considering other hardware possibilities as well.\nFor example, topological quantum computer approaches are being explored for more fault-tolerance computing systems.\nThe first quantum logic gates were implemented with trapped ions and prototype general-purpose machines with up to 20 qubits have been realized. However, the technology behind these devices combines complex vacuum equipment, lasers, and microwave and radio frequency equipment, making full-scale processors difficult to integrate with standard computing equipment. Moreover, the trapped ion system itself has engineering challenges to overcome.\nThe largest commercial systems are based on superconductor devices and have scaled to 2000 qubits. However, the error rates for larger machines have been on the order of 5%. Technologically, these devices are all cryogenic and scaling to large numbers of qubits requires wafer-scale integration, a serious engineering challenge by itself.\nIn addition to cryogenic platforms, room-temperature approaches to spin–photon interfaces have been experimentally demonstrated. In 2025, researchers at Stanford University realized a nanoscale device in which a thin layer of molybdenum diselenide is integrated on a nanostructured silicon substrate, enabling a spin–photon interface that operates at ambient conditions using structured \"twisted\" light to couple electronic and photonic degrees of freedom. Such room-temperature, chip-integrated spin–photon interfaces are being investigated as potential building blocks for heterogeneous quantum networks that combine different qubit modalities and reduce reliance on large cryogenic infrastructures.\n\n\n== Theory ==\n\n\n=== Computability ===\n\nAny computational problem solvable by a classical computer is also solvable by a quantum computer. Intuitively, this is because it is believed that all physical phenomena, including the operation of classical computers, can be described using quantum mechanics, which underlies the operation of quantum computers.\nConversely, any problem solvable by a quantum computer is also solvable by a classical computer. It is possible to simulate both quantum and classical computers manually with just some paper and a pen, if given enough time. More formally, any quantum computer can be simulated by a Turing machine. In other words, quantum computers provide no additional power over classical computers in terms of computability. This means that quantum computers cannot solve undecidable problems like the halting problem, and the existence of quantum computers does not disprove the Church–Turing thesis.\n\n\n=== Complexity ===\n\nWhile quantum computers cannot solve any problems that classical computers cannot already solve, it is suspected that they can solve certain problems faster than classical computers. For instance, it is known that quantum computers can efficiently factor integers, while this is not believed to be the case for classical computers.\nThe class of problems that can be efficiently solved by a quantum computer with bounded error is called BQP, for \"bounded error, quantum, polynomial time\". More formally, BQP is the class of problems that can be solved by a polynomial-time quantum Turing machine with an error probability of at most 1/3. As a class of probabilistic problems, BQP is the quantum counterpart to BPP (\"bounded error, probabilistic, polynomial time\"), the class of problems that can be solved by polynomial-time probabilistic Turing machines with bounded error. It is known that \n  \n    \n      \n        \n          \n            B\n            P\n            P\n            ⊆\n            B\n            Q\n            P\n          \n        \n      \n    \n    {\\displaystyle {\\mathsf {BPP\\subseteq BQP}}}\n  \n but there is no proof \n  \n    \n      \n        \n          \n            B\n            Q\n            P\n            ≠\n            B\n            P\n            P\n          \n        \n      \n    \n    {\\displaystyle {\\mathsf {BQP\\neq BPP}}}\n  \n, which intuitively would mean that quantum computers are more powerful than classical computers in terms of time complexity.\n\nThe exact relationship of BQP to P, NP, and PSPACE is not known. However, it is known that \n  \n    \n      \n        \n          \n            P\n            ⊆\n            B\n            Q\n            P\n            ⊆\n            P\n            S\n            P\n            A\n            C\n            E\n          \n        \n      \n    \n    {\\displaystyle {\\mathsf {P\\subseteq BQP\\subseteq PSPACE}}}\n  \n; that is, all problems that can be efficiently solved by a deterministic classical computer can also be efficiently solved by a quantum computer, and all problems that can be efficiently solved by a quantum computer can also be solved by a deterministic classical computer with polynomial space resources. It is further suspected that BQP is a strict superset of P, meaning that there exist problems that are efficiently solvable by quantum computers that are not efficiently solvable by deterministic classical computers. For instance, integer factorization and the discrete logarithm problem are known to be in BQP and are suspected to be outside of P. On the relationship of BQP to NP, little is known beyond the fact that some NP problems that are believed not to be in P are also in BQP (integer factorization and the discrete logarithm problem are both in NP, for example). It is suspected that \n  \n    \n      \n        \n          \n            N\n            P\n            ⊈\n            B\n            Q\n            P\n          \n        \n      \n    \n    {\\displaystyle {\\mathsf {NP\\nsubseteq BQP}}}\n  \n; that is, it is believed that there are efficiently checkable problems that are not efficiently solvable by a quantum computer. As a direct consequence of this belief, it is also suspected that BQP is disjoint from the class of NP-complete problems (if an NP-complete problem were in BQP, then it would follow from NP-hardness that all problems in NP are in BQP).\n\n\n== List of quantum computers ==\n\nHanyuan-1 — 100-qubit neutral atom quantum computer from the Chinese Academy of Sciences in China.\nIBM Quantum System One — IBM superconducting quantum-computing system introduced in 2019.\nIBM Quantum System Two — modular superconducting system using IBM Heron processors.\nJiuzhang — photonic quantum-computing prototype for Gaussian boson sampling.\nQpiAI-Indus — 25-qubit superconducting quantum computer from QpiAI in India.\n\n\n=== Types of quantum computers ===\nCat qubit quantum computer — proposed approach based on cat-state qubits.\nKane quantum computer — proposed silicon-based nuclear spin quantum-computer architecture.\nLinear optical quantum computing — photonic model using photons and linear optical elements.\nNeutral atom quantum computer — approach using neutral atoms trapped and controlled with optical techniques.\nNuclear magnetic resonance quantum computer — approach using nuclear magnetic resonance and molecular nuclear-spin states.\nSpin qubit quantum computer — semiconductor architecture using spin states as qubits.\nSuperconducting quantum computing — approach using superconducting electronic circuits.\nTopological quantum computer — proposed approach using topological states such as anyons.\nTrapped-ion quantum computer — approach using trapped charged atoms as qubits.\n\n\n== See also ==\nD-Wave Systems – Quantum computing company\nElectronic quantum holography – Information storage technology\nGlossary of quantum computing\nIntelligence Advanced Research Projects Activity – American government agency\nIndia's quantum computer – Indian proposed quantum computer\nQpiAI-Indus – India's first full stack quantum computer\nIonQ – US information technology company\nList of emerging technologies – New technologies actively in development\nList of quantum computing journals\nList of quantum computing books\nList of quantum software\nMagic state distillation – Quantum computing algorithm\nMetacomputing – Computing for the purpose of computing\nNatural computing – Methods that imitate, replicate or use natural processes\nNon-local quantum computation – Method of quantum computing via entanglement\nOptical computing – Computer that uses photons or light waves\nQuantum bus – Device to store or transfer information in quantum computing\nQuantum cognition – Application of quantum theory mathematics to cognitive phenomena\nQuantum sensor – Device measuring quantum mechanical effects\nQuantum volume – Metric for a quantum computer's capabilities\nQuantum weirdness – Unintuitive aspects of quantum mechanics\nRigetti Computing – American quantum computing company\nSupercomputer – Type of extremely powerful computer\nTheoretical computer science – Subfield of computer science and mathematics\nUnconventional computing – Computing by new or unusual methods\nValleytronics – Experimental area in semiconductors\n\n\n== Notes ==\n\n\n== References ==\n\n\n=== Sources ===\nAaronson, Scott (2013). Quantum Computing Since Democritus. Cambridge University Press. doi:10.1017/CBO9780511979309. ISBN 978-0-521-19956-8. OCLC 829706638.\nGrumbling, Emily; Horowitz, Mark, eds. (2019). Quantum Computing: Progress and Prospects. Washington, DC: The National Academies Press. doi:10.17226/25196. ISBN 978-0-309-47970-7. OCLC 1091904777. S2CID 125635007.\nMermin, N. David (2007). Quantum Computer Science: An Introduction. doi:10.1017/CBO9780511813870. ISBN 978-0-511-34258-5. OCLC 422727925.\nNielsen, Michael; Chuang, Isaac (2010). Quantum Computation and Quantum Information (10th anniversary ed.). doi:10.1017/CBO9780511976667. ISBN 978-0-511-99277-3. OCLC 700706156. S2CID 59717455.\n\n\n== Further reading ==\n\n\n== External links ==\n Media related to Quantum computer at Wikimedia Commons\n Learning materials related to Quantum computing at Wikiversity\nStanford Encyclopedia of Philosophy: \"Quantum Computing\" by Amit Hagar and Michael E. Cuffaro\n\"Quantum computation, theory of\", Encyclopedia of Mathematics, EMS Press, 2001 [1994]\nIntroduction to Quantum Computing for Business by Koen Groenland\nSchneider, J., & Smalley, I. (2024, August 5). What Is Quantum Computing? | IBM. https://www.ibm.com/think/topics/quantum-computing\nLectures\n\nQuantum computing for the determined – 22 video lectures by Michael Nielsen\nVideo Lectures Archived 10 February 2010 at the Wayback Machine by David Deutsch\nLomonaco, Sam. Four Lectures on Quantum Computing given at Oxford University in July 2006"
+          }
+        }
+      }
+    },
+    "categories": {
+      "batchcomplete": "",
+      "query": {
+        "pages": {
+          "25220": {
+            "pageid": 25220,
+            "ns": 0,
+            "title": "Quantum computing",
+            "categories": [
+              {
+                "ns": 14,
+                "title": "Category:All Wikipedia articles written in American English"
+              },
+              {
+                "ns": 14,
+                "title": "Category:All articles containing potentially dated statements"
+              },
+              {
+                "ns": 14,
+                "title": "Category:All articles with dead external links"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Articles containing potentially dated statements from 2023"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Articles with dead external links from November 2025"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Articles with short description"
+              },
+              {
+                "ns": 14,
+                "title": "Category:CS1 Russian-language sources (ru)"
+              },
+              {
+                "ns": 14,
+                "title": "Category:CS1 maint: bot: original URL status unknown"
+              },
+              {
+                "ns": 14,
+                "title": "Category:CS1 maint: deprecated archival service"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Classes of computers"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Commons link is locally defined"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Computational complexity theory"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Computer-related introductions in 1980"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Information theory"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Models of computation"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Open problems"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Quantum computing"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Quantum cryptography"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Short description is different from Wikidata"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Supercomputers"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Theoretical computer science"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Use American English from February 2023"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Use dmy dates from February 2021"
+              },
+              {
+                "ns": 14,
+                "title": "Category:Webarchive template wayback links"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "links": {
+      "continue": {
+        "plcontinue": "25220|0|Association_for_Computing_Machinery",
+        "continue": "||"
+      },
+      "query": {
+        "pages": {
+          "25220": {
+            "pageid": 25220,
+            "ns": 0,
+            "title": "Quantum computing",
+            "links": [
+              {
+                "ns": 0,
+                "title": "1-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "12-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "128-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "16-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "24-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "256-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "32-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "4-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "48-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "512-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "64-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "8-bit computing"
+              },
+              {
+                "ns": 0,
+                "title": "ACPI"
+              },
+              {
+                "ns": 0,
+                "title": "AI accelerator"
+              },
+              {
+                "ns": 0,
+                "title": "ARM architecture family"
+              },
+              {
+                "ns": 0,
+                "title": "Abelian group"
+              },
+              {
+                "ns": 0,
+                "title": "Abstract machine"
+              },
+              {
+                "ns": 0,
+                "title": "Acoustic levitation"
+              },
+              {
+                "ns": 0,
+                "title": "Adapteva"
+              },
+              {
+                "ns": 0,
+                "title": "Adder (electronics)"
+              },
+              {
+                "ns": 0,
+                "title": "Address decoder"
+              },
+              {
+                "ns": 0,
+                "title": "Address generation unit"
+              },
+              {
+                "ns": 0,
+                "title": "Addressing mode"
+              },
+              {
+                "ns": 0,
+                "title": "Adiabatic quantum computation"
+              },
+              {
+                "ns": 0,
+                "title": "Adiabatic quantum computer"
+              },
+              {
+                "ns": 0,
+                "title": "Adiabatic theorem"
+              },
+              {
+                "ns": 0,
+                "title": "Advanced Power Management"
+              },
+              {
+                "ns": 0,
+                "title": "Adversary (cryptography)"
+              },
+              {
+                "ns": 0,
+                "title": "Alexei Kitaev"
+              },
+              {
+                "ns": 0,
+                "title": "Algorithm"
+              },
+              {
+                "ns": 0,
+                "title": "Algorithmic cooling"
+              },
+              {
+                "ns": 0,
+                "title": "Alice and Bob"
+              },
+              {
+                "ns": 0,
+                "title": "AlphaEvolve"
+              },
+              {
+                "ns": 0,
+                "title": "Alternating Turing machine"
+              },
+              {
+                "ns": 0,
+                "title": "Aluminium"
+              },
+              {
+                "ns": 0,
+                "title": "American Physical Society"
+              },
+              {
+                "ns": 0,
+                "title": "Ammonia"
+              },
+              {
+                "ns": 0,
+                "title": "Amplitude amplification"
+              },
+              {
+                "ns": 0,
+                "title": "Analogue electronics"
+              },
+              {
+                "ns": 0,
+                "title": "Andrea Morello"
+              },
+              {
+                "ns": 0,
+                "title": "Andrew Hodges"
+              },
+              {
+                "ns": 0,
+                "title": "Anti-gravity"
+              },
+              {
+                "ns": 0,
+                "title": "Anyon"
+              },
+              {
+                "ns": 0,
+                "title": "Apollo Guidance Computer"
+              },
+              {
+                "ns": 0,
+                "title": "Application-specific instruction set processor"
+              },
+              {
+                "ns": 0,
+                "title": "Application-specific integrated circuit"
+              },
+              {
+                "ns": 0,
+                "title": "Applied Physics Reviews"
+              },
+              {
+                "ns": 0,
+                "title": "ArXiv (identifier)"
+              },
+              {
+                "ns": 0,
+                "title": "Arithmetic logic unit"
+              },
+              {
+                "ns": 0,
+                "title": "Artificial intelligence"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "linkshere": {
+      "continue": {
+        "lhcontinue": "14381",
+        "continue": "||"
+      },
+      "query": {
+        "pages": {
+          "25220": {
+            "pageid": 25220,
+            "ns": 0,
+            "title": "Quantum computing",
+            "linkshere": [
+              {
+                "pageid": 775,
+                "ns": 0,
+                "title": "Algorithm"
+              },
+              {
+                "pageid": 1164,
+                "ns": 0,
+                "title": "Artificial intelligence"
+              },
+              {
+                "pageid": 1349,
+                "ns": 0,
+                "title": "Atanasoff–Berry computer"
+              },
+              {
+                "pageid": 2230,
+                "ns": 0,
+                "title": "Analysis of algorithms"
+              },
+              {
+                "pageid": 3130,
+                "ns": 0,
+                "title": "Advanced Power Management"
+              },
+              {
+                "pageid": 4080,
+                "ns": 0,
+                "title": "BQP"
+              },
+              {
+                "pageid": 4214,
+                "ns": 0,
+                "title": "Bioinformatics"
+              },
+              {
+                "pageid": 4266,
+                "ns": 0,
+                "title": "Binary search"
+              },
+              {
+                "pageid": 4542,
+                "ns": 0,
+                "title": "Bra–ket notation"
+              },
+              {
+                "pageid": 5170,
+                "ns": 0,
+                "title": "Combinatorics"
+              },
+              {
+                "pageid": 5213,
+                "ns": 0,
+                "title": "Computing"
+              },
+              {
+                "pageid": 5218,
+                "ns": 0,
+                "title": "Central processing unit"
+              },
+              {
+                "pageid": 5311,
+                "ns": 0,
+                "title": "Computer programming"
+              },
+              {
+                "pageid": 5323,
+                "ns": 0,
+                "title": "Computer science"
+              },
+              {
+                "pageid": 5561,
+                "ns": 0,
+                "title": "Computational linguistics"
+              },
+              {
+                "pageid": 5626,
+                "ns": 0,
+                "title": "Cognitive science"
+              },
+              {
+                "pageid": 5690,
+                "ns": 0,
+                "title": "Chalmers University of Technology"
+              },
+              {
+                "pageid": 5739,
+                "ns": 0,
+                "title": "Compiler"
+              },
+              {
+                "pageid": 5749,
+                "ns": 0,
+                "title": "Key size"
+              },
+              {
+                "pageid": 5863,
+                "ns": 0,
+                "title": "Copenhagen interpretation"
+              },
+              {
+                "pageid": 5869,
+                "ns": 0,
+                "title": "Category theory"
+              },
+              {
+                "pageid": 6019,
+                "ns": 0,
+                "title": "Computational chemistry"
+              },
+              {
+                "pageid": 6511,
+                "ns": 0,
+                "title": "Computational complexity"
+              },
+              {
+                "pageid": 6557,
+                "ns": 0,
+                "title": "Control unit"
+              },
+              {
+                "pageid": 6559,
+                "ns": 0,
+                "title": "Control store"
+              },
+              {
+                "pageid": 6604,
+                "ns": 0,
+                "title": "Rendering (computer graphics)"
+              },
+              {
+                "pageid": 6777,
+                "ns": 0,
+                "title": "Computer animation"
+              },
+              {
+                "pageid": 6834,
+                "ns": 0,
+                "title": "List of computer scientists"
+              },
+              {
+                "pageid": 7398,
+                "ns": 0,
+                "title": "Computer security"
+              },
+              {
+                "pageid": 7543,
+                "ns": 0,
+                "title": "Computational complexity theory"
+              },
+              {
+                "pageid": 7555,
+                "ns": 0,
+                "title": "Casimir effect"
+              },
+              {
+                "pageid": 7597,
+                "ns": 0,
+                "title": "Processor design"
+              },
+              {
+                "pageid": 7622,
+                "ns": 0,
+                "title": "Complex instruction set computer"
+              },
+              {
+                "pageid": 7903,
+                "ns": 0,
+                "title": "Diffie–Hellman key exchange"
+              },
+              {
+                "pageid": 8377,
+                "ns": 0,
+                "title": "Database"
+              },
+              {
+                "pageid": 8667,
+                "ns": 0,
+                "title": "Double-slit experiment"
+              },
+              {
+                "pageid": 8729,
+                "ns": 0,
+                "title": "David Deutsch"
+              },
+              {
+                "pageid": 8971,
+                "ns": 0,
+                "title": "DEC Alpha"
+              },
+              {
+                "pageid": 9476,
+                "ns": 0,
+                "title": "Electron"
+              },
+              {
+                "pageid": 9604,
+                "ns": 0,
+                "title": "Many-worlds interpretation"
+              },
+              {
+                "pageid": 9611,
+                "ns": 0,
+                "title": "E-commerce"
+              },
+              {
+                "pageid": 9828,
+                "ns": 0,
+                "title": "Execution unit"
+              },
+              {
+                "pageid": 9966,
+                "ns": 0,
+                "title": "Elliptic-curve cryptography"
+              },
+              {
+                "pageid": 10018,
+                "ns": 0,
+                "title": "Edsger W. Dijkstra"
+              },
+              {
+                "pageid": 10294,
+                "ns": 0,
+                "title": "Encryption"
+              },
+              {
+                "pageid": 10296,
+                "ns": 0,
+                "title": "Einstein–Podolsky–Rosen paradox"
+              },
+              {
+                "pageid": 12242,
+                "ns": 0,
+                "title": "Germanium"
+              },
+              {
+                "pageid": 12401,
+                "ns": 0,
+                "title": "Graph theory"
+              },
+              {
+                "pageid": 13636,
+                "ns": 0,
+                "title": "History of computing hardware"
+              },
+              {
+                "pageid": 14220,
+                "ns": 0,
+                "title": "History of mathematics"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sections": {
+      "warnings": {
+        "main": {
+          "*": "Subscribe to the mediawiki-api-announce mailing list at <https://lists.wikimedia.org/postorius/lists/mediawiki-api-announce.lists.wikimedia.org/> for notice of API deprecations and breaking changes. Use [[Special:ApiFeatureUsage]] to see usage of deprecated features by your application."
+        },
+        "parse": {
+          "*": "\"prop=sections\" has been deprecated. Please use \"prop=tocdata\" instead."
+        }
+      },
+      "parse": {
+        "title": "Quantum computing",
+        "pageid": 25220,
+        "sections": [
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "History",
+            "number": "1",
+            "index": "1",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 3996,
+            "anchor": "History",
+            "linkAnchor": "History"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Quantum information processing",
+            "number": "2",
+            "index": "2",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 21309,
+            "anchor": "Quantum_information_processing",
+            "linkAnchor": "Quantum_information_processing"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Quantum information",
+            "number": "2.1",
+            "index": "3",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 25164,
+            "anchor": "Quantum_information",
+            "linkAnchor": "Quantum_information"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Unitary operators",
+            "number": "2.2",
+            "index": "4",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 29511,
+            "anchor": "Unitary_operators",
+            "linkAnchor": "Unitary_operators"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Quantum parallelism",
+            "number": "2.3",
+            "index": "5",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 32307,
+            "anchor": "Quantum_parallelism",
+            "linkAnchor": "Quantum_parallelism"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Quantum programming",
+            "number": "2.4",
+            "index": "6",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 33185,
+            "anchor": "Quantum_programming",
+            "linkAnchor": "Quantum_programming"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Gate array",
+            "number": "2.4.1",
+            "index": "7",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 33489,
+            "anchor": "Gate_array",
+            "linkAnchor": "Gate_array"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Measurement-based quantum computing",
+            "number": "2.4.2",
+            "index": "8",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 35345,
+            "anchor": "Measurement-based_quantum_computing",
+            "linkAnchor": "Measurement-based_quantum_computing"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Adiabatic quantum computing",
+            "number": "2.4.3",
+            "index": "9",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 35697,
+            "anchor": "Adiabatic_quantum_computing",
+            "linkAnchor": "Adiabatic_quantum_computing"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Neuromorphic quantum computing",
+            "number": "2.4.4",
+            "index": "10",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 36398,
+            "anchor": "Neuromorphic_quantum_computing",
+            "linkAnchor": "Neuromorphic_quantum_computing"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Topological quantum computing",
+            "number": "2.4.5",
+            "index": "11",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 37308,
+            "anchor": "Topological_quantum_computing",
+            "linkAnchor": "Topological_quantum_computing"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Quantum Turing machine",
+            "number": "2.4.6",
+            "index": "12",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 37845,
+            "anchor": "Quantum_Turing_machine",
+            "linkAnchor": "Quantum_Turing_machine"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Noisy intermediate-scale quantum computing",
+            "number": "2.4.7",
+            "index": "13",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 40023,
+            "anchor": "Noisy_intermediate-scale_quantum_computing",
+            "linkAnchor": "Noisy_intermediate-scale_quantum_computing"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Quantum cryptography and cybersecurity",
+            "number": "2.4.8",
+            "index": "14",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 42656,
+            "anchor": "Quantum_cryptography_and_cybersecurity",
+            "linkAnchor": "Quantum_cryptography_and_cybersecurity"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Communication",
+            "number": "3",
+            "index": "15",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 45046,
+            "anchor": "Communication",
+            "linkAnchor": "Communication"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Quantum communication protocols",
+            "number": "3.1",
+            "index": "16",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 47982,
+            "anchor": "Quantum_communication_protocols",
+            "linkAnchor": "Quantum_communication_protocols"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Algorithms",
+            "number": "4",
+            "index": "17",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 49154,
+            "anchor": "Algorithms",
+            "linkAnchor": "Algorithms"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Simulation of quantum systems",
+            "number": "4.1",
+            "index": "18",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 52816,
+            "anchor": "Simulation_of_quantum_systems",
+            "linkAnchor": "Simulation_of_quantum_systems"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Post-quantum cryptography",
+            "number": "4.2",
+            "index": "19",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 57524,
+            "anchor": "Post-quantum_cryptography",
+            "linkAnchor": "Post-quantum_cryptography"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Search problems",
+            "number": "4.3",
+            "index": "20",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 62221,
+            "anchor": "Search_problems",
+            "linkAnchor": "Search_problems"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Quantum annealing",
+            "number": "4.4",
+            "index": "21",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 66125,
+            "anchor": "Quantum_annealing",
+            "linkAnchor": "Quantum_annealing"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Machine learning",
+            "number": "4.5",
+            "index": "22",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 67759,
+            "anchor": "Machine_learning",
+            "linkAnchor": "Machine_learning"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "AI-assisted algorithm discovery",
+            "number": "4.6",
+            "index": "23",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 74231,
+            "anchor": "AI-assisted_algorithm_discovery",
+            "linkAnchor": "AI-assisted_algorithm_discovery"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Engineering",
+            "number": "5",
+            "index": "24",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 75220,
+            "anchor": "Engineering",
+            "linkAnchor": "Engineering"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Challenges",
+            "number": "5.1",
+            "index": "25",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 75914,
+            "anchor": "Challenges",
+            "linkAnchor": "Challenges"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Coolant",
+            "number": "5.1.1",
+            "index": "26",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 78597,
+            "anchor": "Coolant",
+            "linkAnchor": "Coolant"
+          },
+          {
+            "toclevel": 3,
+            "level": "4",
+            "line": "Decoherence",
+            "number": "5.1.2",
+            "index": "27",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 79968,
+            "anchor": "Decoherence",
+            "linkAnchor": "Decoherence"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Quantum supremacy",
+            "number": "5.2",
+            "index": "28",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 89196,
+            "anchor": "Quantum_supremacy",
+            "linkAnchor": "Quantum_supremacy"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Skepticism",
+            "number": "5.3",
+            "index": "29",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 99446,
+            "anchor": "Skepticism",
+            "linkAnchor": "Skepticism"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Physical realizations",
+            "number": "5.4",
+            "index": "30",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 106457,
+            "anchor": "Physical_realizations",
+            "linkAnchor": "Physical_realizations"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Theory",
+            "number": "6",
+            "index": "31",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 111119,
+            "anchor": "Theory",
+            "linkAnchor": "Theory"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Computability",
+            "number": "6.1",
+            "index": "32",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 111214,
+            "anchor": "Computability",
+            "linkAnchor": "Computability"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Complexity",
+            "number": "6.2",
+            "index": "33",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 112322,
+            "anchor": "Complexity",
+            "linkAnchor": "Complexity"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "List of quantum computers",
+            "number": "7",
+            "index": "34",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 115835,
+            "anchor": "List_of_quantum_computers",
+            "linkAnchor": "List_of_quantum_computers"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Types of quantum computers",
+            "number": "7.1",
+            "index": "35",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 117677,
+            "anchor": "Types_of_quantum_computers",
+            "linkAnchor": "Types_of_quantum_computers"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "See also",
+            "number": "8",
+            "index": "36",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 118643,
+            "anchor": "See_also",
+            "linkAnchor": "See_also"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Notes",
+            "number": "9",
+            "index": "37",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 119798,
+            "anchor": "Notes",
+            "linkAnchor": "Notes"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "References",
+            "number": "10",
+            "index": "38",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 119824,
+            "anchor": "References",
+            "linkAnchor": "References"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Sources",
+            "number": "10.1",
+            "index": "39",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 119859,
+            "anchor": "Sources",
+            "linkAnchor": "Sources"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "Further reading",
+            "number": "11",
+            "index": "40",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 120943,
+            "anchor": "Further_reading",
+            "linkAnchor": "Further_reading"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Textbooks",
+            "number": "11.1",
+            "index": "41",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 120984,
+            "anchor": "Textbooks",
+            "linkAnchor": "Textbooks"
+          },
+          {
+            "toclevel": 2,
+            "level": "3",
+            "line": "Academic papers",
+            "number": "11.2",
+            "index": "42",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 125253,
+            "anchor": "Academic_papers",
+            "linkAnchor": "Academic_papers"
+          },
+          {
+            "toclevel": 1,
+            "level": "2",
+            "line": "External links",
+            "number": "12",
+            "index": "43",
+            "fromtitle": "Quantum_computing",
+            "byteoffset": 128384,
+            "anchor": "External_links",
+            "linkAnchor": "External_links"
+          }
+        ],
+        "showtoc": ""
+      }
+    },
+    "pageimages": {
+      "batchcomplete": "",
+      "query": {
+        "pages": {
+          "25220": {
+            "pageid": 25220,
+            "ns": 0,
+            "title": "Quantum computing",
+            "thumbnail": {
+              "source": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/IBM_Quantum_Computer_Demo_at_ITUWTSA_2024%2C_Delhi_2.jpg/250px-IBM_Quantum_Computer_Demo_at_ITUWTSA_2024%2C_Delhi_2.jpg",
+              "width": 200,
+              "height": 267
+            },
+            "pageimage": "IBM_Quantum_Computer_Demo_at_ITUWTSA_2024,_Delhi_2.jpg"
+          }
+        }
+      }
+    }
+  }
+}

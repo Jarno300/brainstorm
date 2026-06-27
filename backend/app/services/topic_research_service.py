@@ -9,7 +9,6 @@ parent/child/related taxonomy.
 import logging
 import re
 import time
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -21,127 +20,13 @@ from app.services.topic_service import (
     create_topic, create_edge, get_topic_by_name,
     normalize_topic_name, delete_propositions,
 )
-from app.services.library_service import create_library_entry
+from app.services.enrichment_service import create_topic_library_entry
 from app.services.brainstorm_service import get_brainstorm, update_brainstorm_title
 from app.models.topic_edge import TopicEdge
+from app.schemas.research import ResearchResult
+from app.formatters import research_result_to_markdown, taxonomy_to_markdown
 
 logger = logging.getLogger(__name__)
-
-# ─────────────────────────────────────────────────────────────────────
-# Research Prompt — one call to rule them all
-# ─────────────────────────────────────────────────────────────────────
-
-@dataclass
-class ResearchResult:
-    """Parsed research output from the LLM."""
-    summary: str = ""
-    overview: str = ""
-    key_concepts: List[dict] = field(default_factory=list)
-    use_cases: List[dict] = field(default_factory=list)
-    parent_topics: List[dict] = field(default_factory=list)
-    child_topics: List[dict] = field(default_factory=list)
-    related_topics: List[dict] = field(default_factory=list)
-
-
-def _research_to_markdown(
-    topic_name: str,
-    result: ResearchResult,
-    library_content: str = "",
-    include_taxonomy: bool = True,
-) -> str:
-    """Convert a ResearchResult into structured markdown for the library entry.
-
-    The library_content parameter can contain additional LLM-generated content
-    to prepend. If empty, builds the entire document from ResearchResult.
-
-    Taxonomy sections (parent/child/related topics) are only included when
-    include_taxonomy=True. By default they are omitted because
-    build_knowledge_map() creates proposition topics directly on the canvas,
-    making markdown-level taxonomy redundant.
-    """
-    display = topic_name.replace("-", " ").title()
-    lines = []
-
-    if library_content.strip():
-        lines.append(library_content.strip())
-    else:
-        # Build from ResearchResult fields
-        lines.append(f"# {display}")
-        lines.append("")
-        if result.summary:
-            lines.append(f"> {result.summary}")
-            lines.append("")
-        if result.overview:
-            lines.append("## Overview")
-            lines.append("")
-            lines.append(result.overview)
-            lines.append("")
-
-        if result.key_concepts:
-            lines.append("## Key Concepts")
-            lines.append("")
-            for kc in result.key_concepts:
-                name = kc.get("name", "").strip()
-                desc = kc.get("description", "").strip()
-                lines.append(f"- **{name}**: {desc}")
-            lines.append("")
-
-        if result.use_cases:
-            lines.append("## Use Cases")
-            lines.append("")
-            for uc in result.use_cases:
-                name = uc.get("name", "").strip()
-                desc = uc.get("description", "").strip()
-                lines.append(f"- **{name}**: {desc}")
-            lines.append("")
-
-    # Taxonomy sections — only included when requested (e.g., from the chat pipeline
-    # where proposition topics aren't created separately)
-    if include_taxonomy:
-        for key, heading in [
-            ("parent_topics", "Parent Topics"),
-            ("child_topics", "Child Topics"),
-            ("related_topics", "Related Topics"),
-        ]:
-            items = getattr(result, key, [])
-            if not items:
-                continue
-            lines.append(f"## {heading}")
-            lines.append("")
-            for item in items:
-                name = item.get("name", "unknown")
-                desc = item.get("description", "")
-                lines.append(f"- {name} - {desc}")
-            lines.append("")
-
-    return "\n".join(lines)
-
-
-def taxonomy_to_markdown(taxonomy: dict) -> str:
-    """Convert a taxonomy dict to markdown sections for library entries.
-
-    Args:
-        taxonomy: Dict with parent_topics, child_topics, related_topics keys,
-                  each containing [{"name": str, "description": str}, ...]
-
-    Returns:
-        Markdown string with ## Parent Topics, ## Child Topics, ## Related Topics.
-    """
-    sections = []
-    for key, heading in [
-        ("parent_topics", "Parent Topics"),
-        ("child_topics", "Child Topics"),
-        ("related_topics", "Related Topics"),
-    ]:
-        items = taxonomy.get(key, [])
-        if items:
-            lines = [f"## {heading}", ""]
-            for item in items:
-                name = item.get("name", "unknown")
-                desc = item.get("description", "")
-                lines.append(f"- {name} - {desc}")
-            sections.append("\n".join(lines))
-    return "\n\n".join(sections)
 
 
 def research_topic(
@@ -159,7 +44,7 @@ def research_topic(
     from app.services.wikipedia_service import resolve_page_sync, page_to_research_result
 
     t0 = time.perf_counter()
-    display = topic_name.replace("-", " ").title()
+    display = topic_name.replace("-", " ").strip()
 
     logger.debug("research_topic start (wikipedia) | topic=%s", topic_name)
 
@@ -217,7 +102,7 @@ def build_knowledge_map(
     existing_names = {normalize_topic_name(t.name) for t in existing_topics}
 
     # Build markdown from ResearchResult
-    md_content = _research_to_markdown(topic_name, result)
+    md_content = research_result_to_markdown(topic_name, result)
 
     # Create or update the primary topic
     normalized = normalize_topic_name(topic_name)
@@ -238,22 +123,17 @@ def build_knowledge_map(
             commit=False,
         )
 
-    # Create library entry
-    file_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
-    entry = create_library_entry(
+    # Create library entry and store taxonomy
+    create_topic_library_entry(
         db=db,
         brainstorm_id=brainstorm_id,
-        topic_id=primary.id,
+        topic=primary,
         folder_name=slug,
-        file_name=file_name,
         content=md_content,
-        commit=False,
         source_type="research",
         source_model=model if model else None,
+        commit=False,
     )
-    primary.library_path = entry.file_path
-
-    # Store taxonomy directly on the topic (no markdown roundtrip)
     primary.taxonomy = {
         "parent_topics": result.parent_topics,
         "child_topics": result.child_topics,
@@ -336,3 +216,118 @@ def build_knowledge_map(
         topic_name, created_count,
     )
     return primary
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Wikipedia enrichment — library content + taxonomy generation
+# ─────────────────────────────────────────────────────────────────────
+# (Merged from topic_enrichment_service.py — Phase 2 cleanup)
+
+
+def generate_library_content(
+    topic_name: str,
+    conversation_text: str,
+    model: Optional[str] = None,
+) -> str:
+    """Generate a structured markdown library entry for a topic using Wikipedia.
+
+    Resolves the topic name to a Wikipedia article and produces a document
+    with Overview, Key Concepts, Use Cases, and Source sections.
+
+    Falls back to a minimal entry if Wikipedia has no article.
+    """
+    from app.services.wikipedia_service import resolve_page_sync, page_to_markdown
+
+    t0 = time.perf_counter()
+    display_name = topic_name.replace("-", " ").strip()
+
+    logger.debug("generate_library_content start (wikipedia) | topic=%s", topic_name)
+
+    try:
+        page = resolve_page_sync(display_name)
+        elapsed = time.perf_counter() - t0
+
+        if page is None:
+            logger.debug(
+                "generate_library_content no_article | topic=%s elapsed=%.2fs",
+                topic_name, elapsed,
+            )
+            return (
+                f"# {display_name}\n\n"
+                f"> No Wikipedia article found for this topic.\n\n"
+                f"## Overview\n\n"
+                f"Explore this topic further by researching "
+                f"{display_name} on Wikipedia or asking follow-up questions.\n\n"
+            )
+
+        content = page_to_markdown(page)
+        logger.debug(
+            "generate_library_content done (wikipedia) | topic=%s elapsed=%.2fs chars=%d pageid=%d",
+            topic_name, elapsed, len(content), page.pageid,
+        )
+        return content
+
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        logger.error(
+            "generate_library_content error | topic=%s elapsed=%.2fs error=%s",
+            topic_name, elapsed, e,
+        )
+        return (
+            f"# {display_name}\n\n"
+            f"> Unable to fetch content for this topic.\n\n"
+            f"## Overview\n\n"
+            f"Research {display_name} on Wikipedia or ask follow-up questions.\n\n"
+        )
+
+
+def generate_topic_taxonomy(
+    topic_name: str,
+    library_content: str = "",
+    conversation_text: str = "",
+    model: Optional[str] = None,
+) -> dict:
+    """Generate parent/child/related topic taxonomy using Wikipedia.
+
+    Resolves the topic name to a Wikipedia article and extracts
+    categories (parent), linkshere (child), and links (related).
+    """
+    from app.services.wikipedia_service import resolve_page_sync, page_to_taxonomy
+
+    t0 = time.perf_counter()
+    display_name = topic_name.replace("-", " ").strip()
+    empty_result = {"parent_topics": [], "child_topics": [], "related_topics": []}
+
+    logger.debug("generate_topic_taxonomy start (wikipedia) | topic=%s", topic_name)
+
+    try:
+        page = resolve_page_sync(display_name)
+        elapsed = time.perf_counter() - t0
+
+        if page is None:
+            logger.debug(
+                "generate_topic_taxonomy no_article | topic=%s elapsed=%.2fs",
+                topic_name, elapsed,
+            )
+            return empty_result
+
+        result = page_to_taxonomy(page)
+        total = sum(len(v) for v in result.values())
+        logger.debug(
+            "generate_topic_taxonomy done (wikipedia) | topic=%s elapsed=%.2fs "
+            "parents=%d children=%d related=%d pageid=%d",
+            topic_name, elapsed,
+            len(result["parent_topics"]),
+            len(result["child_topics"]),
+            len(result["related_topics"]),
+            page.pageid,
+        )
+        return result
+
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        logger.error(
+            "generate_topic_taxonomy error | topic=%s elapsed=%.2fs error=%s",
+            topic_name, elapsed, e,
+        )
+        return empty_result

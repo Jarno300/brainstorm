@@ -37,7 +37,6 @@ function CardDisplayMode({ topic, exploringName, libraryEntry, librarySections, 
                     color: alpha(theme.palette.text.secondary, 0.6),
                     lineHeight: 1.55, fontStyle: 'italic',
                     mb: librarySections.length > 0 ? 1.5 : 0,
-                    px: 0.5, borderLeft: `2px solid ${alpha(color, 0.12)}`,
                 })}>
                     {summaryText}
                 </Typography>

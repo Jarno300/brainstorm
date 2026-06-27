@@ -4,8 +4,8 @@ from app.tasks.research_tasks import (
     process_research_sync,
     process_connection_exploration,
     process_connection_exploration_sync,
-    CONNECTION_PROMPT,
 )
+from app.services.connection_exploration_service import CONNECTION_PROMPT
 
 __all__ = [
     "celery_app",
